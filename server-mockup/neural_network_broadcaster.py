@@ -46,7 +46,7 @@ def main():
         "-deadline", "realtime",
         "-cpu-used", "4",
         "-f", "tee",
-        "[select=v:f=rtp:ssrc=22222222:payload_type=102]rtp://100.100.2.179:32258?rtcpport=32257"
+        "[select=v:f=rtp:ssrc=22222222:payload_type=102]rtp://172.17.0.1:32258?rtcpport=32257"
     ]
 
     process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)

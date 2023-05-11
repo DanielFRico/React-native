@@ -14,6 +14,7 @@ registerGlobals(); // Register WebRTC globals
 // Utility functions
 // ================
 
+
 let requestId = 0;
 const pendingRequests = new Map();
 
@@ -30,9 +31,10 @@ function socketRequest(socket, message) {
 
 // ----------------------------------------------------------------------------
 
-socket = new WebSocket(CONFIG.http);
+
 
 const SafebirdScreen = () => {
+  socket = new WebSocket(CONFIG.http);
   // const [socket, setSocket] = useState(null);
   
   const [videoTrack, setVideoTrack] = useState(null);

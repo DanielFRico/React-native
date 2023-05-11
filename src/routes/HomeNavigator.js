@@ -13,13 +13,7 @@ export default function HomeNavigator() {
                 headerStyle: { elevation: 0, shadowOpacity: 0 },
             }}
         >
-             <HomeStack.Screen
-                name="SafebirdScreen"
-                component={SafebirdScreen}
-                options={{ title: "Safebird" }}
-            />
-
-            <HomeStack.Screen
+               <HomeStack.Screen
                 name="HomeScreen"
                 options={{
                     headerLargeTitle: false,
@@ -28,6 +22,13 @@ export default function HomeNavigator() {
                 }}
                 component={HomeScreen}
             />
+             <HomeStack.Screen
+                name="SafebirdScreen"
+                component={SafebirdScreen}
+                options={{ title: "Safebird" }}
+            />
+
+         
            
         </HomeStack.Navigator>
     );
