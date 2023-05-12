@@ -28,34 +28,58 @@ const BluetoothScreen = () => {
 
   useEffect(() => {
     // Turn on Bluetooth if it is not on
-    BleManager.enableBluetooth().then(() => {
-      console.log('Bluetooth is turned on!');
-    });
+    BleManager.enableBluetooth()
+      .then(() => {
+        console.log('Bluetooth is turned on!');
 
-    if (Platform.OS === 'android' && Platform.Version >= 23) {
-      PermissionsAndroid.check(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      ).then(result => {
-        if (result) {
-          console.log('Permission is OK');
-        } else {
-          PermissionsAndroid.request(
+        if (Platform.OS === 'android' && Platform.Version >= 29) {
+          // Check for Android 10 and above
+          PermissionsAndroid.check(
             PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          ).then(result => {
+          ).then((result) => {
             if (result) {
-              console.log('User accept');
+              console.log('Permission is OK');
             } else {
-              console.log('User refuse');
+              PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+              ).then((result) => {
+                if (result) {
+                  console.log('User accept');
+                } else {
+                  console.log('User refuse');
+                }
+              });
             }
           });
         }
-      });
-    }
 
-    // start bluetooth manager
-    BleManager.start({showAlert: false}).then(() => {
-      console.log('BleManager initialized');
-    });
+        // Request for Bluetooth Scan permission
+        PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        ).then((result) => {
+          if (result) {
+            console.log('Bluetooth Scan Permission is OK');
+          } else {
+            PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+            ).then((result) => {
+              if (result) {
+                console.log('User accept Bluetooth Scan');
+              } else {
+                console.log('User refuse Bluetooth Scan');
+              }
+            });
+          }
+        });
+
+        // start bluetooth manager
+        BleManager.start({ showAlert: false }).then(() => {
+          console.log('BleManager initialized');
+        });
+      })
+      .catch((error) => {
+        console.log('The user refused to enable bluetooth');
+      });
   }, []);
 
   const [isScanning, setIsScanning] = useState(false);
@@ -70,6 +94,19 @@ const BluetoothScreen = () => {
     );
     return () => {
       stopListener.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const discoverListener = BleManagerEmitter.addListener(
+      'BleManagerDiscoverPeripheral',
+      (device) => {
+        console.log('Discovered device:', device);
+      },
+    );
+
+    return () => {
+      discoverListener.remove();
     };
   }, []);
 
