@@ -15,6 +15,12 @@ const HomeScreen = ({ navigation }) => {
         >
           <Text style={styles.buttonText}>Start Driving</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate("BluetoothScreen")}
+        >
+          <Text style={styles.buttonText}>Bluetooth</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.button}>
           <Text style={styles.buttonText}>Start Recording</Text>
         </TouchableOpacity>
