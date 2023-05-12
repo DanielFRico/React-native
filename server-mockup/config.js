@@ -84,7 +84,7 @@ module.exports = {
       plainTransport: {
         // If running from localhost or with Docker "host network", use the
         // localhost IP address.
-        listenIp: { ip: "0.0.0.0", announcedIp: "1172.17.0.1" },
+        listenIp: { ip: "0.0.0.0", announcedIp: "172.17.0.1" },
   
         // If running from a non-"host network" Linux Docker container, use
         // the Docker network gateway IP, which by default is "172.17.0.1".
