@@ -2,6 +2,7 @@ import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 import SafebirdScreen from "../screens/SafebirdScreen";
 import HomeScreen from "../screens/HomeScreen";
+import BluetoothScreen from "../screens/BluetoothScreen";
 
 
 export default function HomeNavigator() {
@@ -26,6 +27,11 @@ export default function HomeNavigator() {
                 name="SafebirdScreen"
                 component={SafebirdScreen}
                 options={{ title: "Safebird" }}
+            />
+            <HomeStack.Screen
+                name="BluetoothScreen"
+                component={BluetoothScreen}
+                options={{ title: "Bluetooth connection" }}
             />
 
          
