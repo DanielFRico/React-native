@@ -93,9 +93,9 @@ android {
 
     compileSdkVersion rootProject.ext.compileSdkVersion
 
-    namespace "com.demoapp"
+    namespace "com.webrtcimageapp"
     defaultConfig {
-        applicationId "com.demoapp"
+        applicationId "com.webrtcimageapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

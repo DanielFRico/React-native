@@ -1,0 +1,17 @@
+{
+  "name": "webrtc-server",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "debug": "^4.3.4",
+    "mediasoup": "^3.11.24",
+    "ws": "^8.13.0"
+  }
+}
