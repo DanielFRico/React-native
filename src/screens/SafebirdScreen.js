@@ -34,7 +34,9 @@ function socketRequest(socket, message) {
 
 
 const SafebirdScreen = () => {
-  socket = new WebSocket(CONFIG.http);
+  const reconnectDelay = 3000; // delay 5 seconds for the first reconnection
+  let reconnectAttempts = 0
+
   // const [socket, setSocket] = useState(null);
   
   const [videoTrack, setVideoTrack] = useState(null);
@@ -57,36 +59,51 @@ const SafebirdScreen = () => {
 
   useEffect(() => {
 
-    // Setup a single 'onmessage' event listener for the socket
-    // This implementation assigns a unique ID to each request, and it 
-    // stores the pending requests in a pendingRequests Map. When a response 
-    // is received, it looks up the corresponding request by its ID and 
-    // resolves or rejects the Promise accordingly.
-    socket.onmessage = (event) => {
-      const response = JSON.parse(event.data);
-      const { requestId, error } = response;
+    initializeWebSocket();
 
-      const pendingRequest = pendingRequests.get(requestId);
+    async function initializeWebSocket() {
+      socket = new WebSocket(CONFIG.http);
 
-      if (pendingRequest) {
-        const { resolve, reject } = pendingRequest;
+      // Setup a single 'onmessage' event listener for the socket
+      // This implementation assigns a unique ID to each request, and it 
+      // stores the pending requests in a pendingRequests Map. When a response 
+      // is received, it looks up the corresponding request by its ID and 
+      // resolves or rejects the Promise accordingly.
+      socket.onmessage = (event) => {
+        const response = JSON.parse(event.data);
+        const { requestId, error } = response;
 
-        if (error) {
-          reject(error);
+        const pendingRequest = pendingRequests.get(requestId);
+
+        if (pendingRequest) {
+          const { resolve, reject } = pendingRequest;
+
+          if (error) {
+            reject(error);
+          } else {
+            resolve(response);
+          }
+
+          pendingRequests.delete(requestId);
         } else {
-          resolve(response);
+          console.error('Received response for unknown request ID:', requestId);
         }
+      };
 
-        pendingRequests.delete(requestId);
-      } else {
-        console.error('Received response for unknown request ID:', requestId);
-      }
-    };
+      socket.onopen = async () => {
+        console.log('Connected to server');
+        reconnectAttempts = 0; // reset the counter
+        await startWebRTC()
+      };
 
-    socket.onopen = async () => {
-      console.log('Connected to server');
-      await startWebRTC()
-    };
+      socket.onclose = async (event) => {
+        console.log(`Socket closed with code ${event.code}`);
+        reconnectAttempts++;
+        setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
+        console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
+      };
+
+    }
 
     async function startWebRTC() {
       log("[startWebRTC] Start WebRTC transmission from browser to mediasoup");
