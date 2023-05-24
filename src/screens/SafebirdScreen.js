@@ -62,6 +62,8 @@ const SafebirdScreen = () => {
   useEffect(() => {
     
     let heartbeatIntervalId;
+    let reconnectTimeoutId; // variable to hold reconnect timeout id
+    let isComponentMounted = true; // Keep track of whether the component is mounted
 
     async function initializeWebSocket() {
 
@@ -111,23 +113,29 @@ const SafebirdScreen = () => {
       socket.onclose = async (event) => {
         console.log(`Socket closed with code ${event.code}`);
         
-        reconnectAttempts++;
-        setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
-        console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
-
-        
+        if(isComponentMounted) { // Only attempt to reconnect if the component is still mounted
+          reconnectAttempts++;
+          reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
+          console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
+        }
       };
 
     }
+    
 
     initializeWebSocket();
 
-    // Clear the heartbeat interval when the component unmounts.
-    return () => {
+     // Clear the heartbeat interval and reconnect timeout when the component unmounts.
+     return () => {
+      isComponentMounted = false; // Indicate that the component is no longer mounted
       if (heartbeatIntervalId) {
         clearInterval(heartbeatIntervalId);
       }
+      if (reconnectTimeoutId) {
+        clearTimeout(reconnectTimeoutId);
+      }
     };
+
 
     async function startWebRTC() {
       log("[startWebRTC] Start WebRTC transmission from browser to mediasoup");
