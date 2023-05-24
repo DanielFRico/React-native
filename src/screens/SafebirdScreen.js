@@ -67,12 +67,6 @@ const SafebirdScreen = () => {
 
     async function initializeWebSocket() {
 
-      // Close any active transports
-      for (const transport of activeTransports) {
-        transport.close();
-      }
-      activeTransports.length = 0; // Clear the array
-
       socket = new WebSocket(CONFIG.http);
 
       // Setup heartbeat sender
@@ -112,6 +106,12 @@ const SafebirdScreen = () => {
 
       socket.onclose = async (event) => {
         console.log(`Socket closed with code ${event.code}`);
+
+        // Close any active transports
+        for (const transport of activeTransports) {
+          transport.close();
+        }
+        activeTransports.length = 0; // Clear the array
         
         if(isComponentMounted) { // Only attempt to reconnect if the component is still mounted
           reconnectAttempts++;
