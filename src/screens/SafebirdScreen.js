@@ -37,6 +37,8 @@ const SafebirdScreen = () => {
   const reconnectDelay = 3000; // delay 5 seconds for the first reconnection
   let reconnectAttempts = 0
 
+  const activeTransports = [];
+
   // const [socket, setSocket] = useState(null);
   
   const [videoTrack, setVideoTrack] = useState(null);
@@ -62,6 +64,13 @@ const SafebirdScreen = () => {
     let heartbeatIntervalId;
 
     async function initializeWebSocket() {
+
+      // Close any active transports
+      for (const transport of activeTransports) {
+        transport.close();
+      }
+      activeTransports.length = 0; // Clear the array
+
       socket = new WebSocket(CONFIG.http);
 
       // Setup heartbeat sender
@@ -101,9 +110,12 @@ const SafebirdScreen = () => {
 
       socket.onclose = async (event) => {
         console.log(`Socket closed with code ${event.code}`);
+        
         reconnectAttempts++;
         setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
         console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
+
+        
       };
 
     }
@@ -192,6 +204,7 @@ const SafebirdScreen = () => {
       let transport;
       try {
         transport = device.createRecvTransport(webrtcTransportOptions);
+        activeTransports.push(transport); // Add the transport to the array
       } catch (err) {
         log.error("[startWebrtcRecv] ERROR:", err);
         return;
