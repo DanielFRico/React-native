@@ -27,55 +27,63 @@ const BluetoothScreen = () => {
   const BleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 
   useEffect(() => {
-    const initializeBluetooth = async () => {
-      try {
-        await BleManager.enableBluetooth();
+    // Turn on Bluetooth if it is not on
+    BleManager.enableBluetooth()
+      .then(() => {
         console.log('Bluetooth is turned on!');
-  
+
         if (Platform.OS === 'android' && Platform.Version >= 29) {
-          const locationPermission = await PermissionsAndroid.check(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-          );
-          if (!locationPermission) {
-            const granted = await PermissionsAndroid.request(
-              PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-            );
-            if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-              console.log('Location permission granted');
+          // Check for Android 10 and above
+          PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          ).then((result) => {
+            if (result) {
+              console.log('Permission is OK');
             } else {
-              console.log('Location permission denied');
+              PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+              ).then((result) => {
+                if (result) {
+                  console.log('User accept');
+                } else {
+                  console.log('User refuse');
+                }
+              });
             }
-          }
+          });
         }
-  
-        const scanPermission = await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
-        );
-        if (!scanPermission) {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN
-          );
-          if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-            console.log('Bluetooth Scan permission granted');
+
+        // Request for Bluetooth Scan permission
+        PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        ).then((result) => {
+          if (result) {
+            console.log('Bluetooth Scan Permission is OK');
           } else {
-            console.log('Bluetooth Scan permission denied');
+            PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+            ).then((result) => {
+              if (result) {
+                console.log('User accept Bluetooth Scan');
+              } else {
+                console.log('User refuse Bluetooth Scan');
+              }
+            });
           }
-        }
-  
-        await BleManager.start({ showAlert: false });
-        console.log('BleManager initialized');
-      } catch (error) {
-        console.log('The user refused to enable Bluetooth');
-      }
-    };
-  
-    initializeBluetooth();
+        });
+
+        // start bluetooth manager
+        BleManager.start({ showAlert: false }).then(() => {
+          console.log('BleManager initialized');
+        });
+      })
+      .catch((error) => {
+        console.log('The user refused to enable bluetooth');
+      });
   }, []);
-  
 
   const [isScanning, setIsScanning] = useState(false);
   const [discoveredDevices, setDiscoveredDevices] = useState([]);
-  const [selectedDevice, setSelectedDevice] = useState(null);
 
   useEffect(() => {
     let stopListener = BleManagerEmitter.addListener(
@@ -90,13 +98,19 @@ const BluetoothScreen = () => {
     };
   }, []);
 
+
+
   useEffect(() => {
     const discoverListener = BleManagerEmitter.addListener(
       'BleManagerDiscoverPeripheral',
       (device) => {
         console.log('Discovered device:', device);
-        if (!discoveredDevices.some(d => d.id === device.id)) {
-          setDiscoveredDevices((prevDevices) => [...prevDevices, device]);
+
+        if (!discoveredDevices[device.id]) {
+          setDiscoveredDevices((prevDevices) => ({
+            ...prevDevices,
+            [device.id]: device,
+          }));
         }
       },
     );
@@ -104,11 +118,12 @@ const BluetoothScreen = () => {
     return () => {
       discoverListener.remove();
     };
-  }, [discoveredDevices]);
+  }, []);
+
 
   const startScan = () => {
     if (!isScanning) {
-      BleManager.scan([], 30, true)
+      BleManager.scan([], 5, true)
         .then(() => {
           setIsScanning(true);
         })
@@ -119,15 +134,9 @@ const BluetoothScreen = () => {
   };
 
   const connectToDevice = (device) => {
-    BleManager.connect(device.id)
-      .then(() => {
-        console.log('Connected to device:', device.name);
-      })
-      .catch((error) => {
-        console.error('Failed to connect:', error);
-      });
+    // Implement your logic to connect to the selected device
+    console.log('Connecting to device:', device);
   };
-  
 
   return (
     <SafeAreaView style={[backgroundStyle, styles.mainBody]}>
@@ -166,21 +175,21 @@ const BluetoothScreen = () => {
               {isScanning ? 'Scanning...' : 'Scan Bluetooth Devices'}
             </Text>
           </TouchableOpacity>
-  
-          {discoveredDevices.map((device) => (
-  <TouchableOpacity
-    key={device.id} // Assign a unique key
-    style={styles.deviceButton}
-    onPress={() => connectToDevice(device)}
-  >
-    <Text style={styles.deviceButtonText}>
-      {device.name || device.advertising?.localName || device.id || 'Unknown Device'}
-    </Text>
-  </TouchableOpacity>
-))}
-
-
         </View>
+
+        {/* Display discovered devices */}
+        {discoveredDevices.map((device) => (
+          <TouchableOpacity
+            key={device.id}
+            style={styles.deviceButton}
+            onPress={() => connectToDevice(device)}
+          >
+            <Text style={styles.deviceButtonText}>
+              {device.advertising.localName || 'Unknown Device'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -211,21 +220,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
   },
+
   deviceButton: {
-    backgroundColor: '#307ecc',
+    backgroundColor: '#eaeaea',
     borderWidth: 0,
-    color: '#FFFFFF',
-    borderColor: '#307ecc',
+    color: '#000000',
+    borderColor: '#eaeaea',
     height: 40,
     alignItems: 'center',
-    borderRadius: 30,
-    marginLeft: 35,
-    marginRight: 35,
-    marginTop: 15,
+    borderRadius: 5,
+    marginHorizontal: 35,
+    marginBottom: 10,
+    justifyContent: 'center',
   },
   deviceButtonText: {
-    color: '#FFFFFF',
-    paddingVertical: 10,
+    color: '#000000',
     fontSize: 16,
   },
 });
