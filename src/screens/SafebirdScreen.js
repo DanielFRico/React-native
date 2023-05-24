@@ -58,11 +58,14 @@ const SafebirdScreen = () => {
   let device;
 
   useEffect(() => {
-
-    initializeWebSocket();
+    
+    let heartbeatIntervalId;
 
     async function initializeWebSocket() {
       socket = new WebSocket(CONFIG.http);
+
+      // Setup heartbeat sender
+      heartbeatIntervalId = setInterval(() => sendHeartbeat(socket), 500);
 
       // Setup a single 'onmessage' event listener for the socket
       // This implementation assigns a unique ID to each request, and it 
@@ -104,6 +107,15 @@ const SafebirdScreen = () => {
       };
 
     }
+
+    initializeWebSocket();
+
+    // Clear the heartbeat interval when the component unmounts.
+    return () => {
+      if (heartbeatIntervalId) {
+        clearInterval(heartbeatIntervalId);
+      }
+    };
 
     async function startWebRTC() {
       log("[startWebRTC] Start WebRTC transmission from browser to mediasoup");
@@ -252,6 +264,12 @@ const SafebirdScreen = () => {
     }
         
   }, []);
+
+  function sendHeartbeat(socket) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "HEARTBEAT" }));
+    }
+  }
 
   return (
     <View style={styles.container}>
