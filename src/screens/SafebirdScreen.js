@@ -1,7 +1,7 @@
 const CONFIG = require("../../config");
 const log = require("../../logging");
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 const MediasoupClient = require("mediasoup-client");
 import { registerGlobals } from 'react-native-webrtc';
 import { RTCView } from 'react-native-webrtc';
@@ -43,6 +43,8 @@ const SafebirdScreen = () => {
   
   const [videoTrack, setVideoTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("SAFEBIRD view loading ...");
+
   const videoRef = React.createRef();
 
   WebSocket.prototype.sendAsync = function (data) {
@@ -260,7 +262,9 @@ const SafebirdScreen = () => {
 
       // Start mediasoup-client's WebRTC consumer(s)
     
-      const stream = new MediaStream();    
+      const stream = new MediaStream();  
+      
+      let streamReceivedTimeout;
     
       if (useVideo) {
 
@@ -272,10 +276,21 @@ const SafebirdScreen = () => {
         // Update the videoTrack state
         setVideoTrack(new MediaStream([consumer.track]));
 
+        // Set a timeout for receiving the stream
+        streamReceivedTimeout = setTimeout(() => {
+          if (!isPlaying) {
+            console.log("HEHREHHERHEHRHEHREHEHRH")
+            setStatusMessage("Error in receiving SAFEBIRD view, trying to reconnect...");
+            socket.close(); // Close the websocket
+            initializeWebSocket(); // Attempt to reconnect
+          }
+        }, 5000); // 5 seconds
+
         // Check if the stream is being received
         if (stream.getVideoTracks().length > 0) {
           log('Stream received:', stream);
           setIsPlaying(true);
+          clearTimeout(streamReceivedTimeout);
         } else {
           log('No stream received');
         }
@@ -293,16 +308,17 @@ const SafebirdScreen = () => {
 
   return (
     <View style={styles.container}>
-      {videoTrack && (
-        <RTCView
-          style={styles.video}
-          streamURL={videoTrack.toURL()}
-          objectFit="cover"
-        />
-      )}
-    </View>
+  <Text>{`${statusMessage}`}</Text> 
+  {videoTrack && (
+    <RTCView
+      style={styles.video}
+      streamURL={videoTrack.toURL()}
+      objectFit="cover"
+    />
+  )}
+</View>
   );
-};
+};  
 
 const styles = StyleSheet.create({
   container: {
