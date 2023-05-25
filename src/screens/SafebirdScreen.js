@@ -121,7 +121,6 @@ const SafebirdScreen = () => {
       };
 
     }
-    
 
     initializeWebSocket();
 
