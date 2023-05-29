@@ -37,6 +37,7 @@ const SafebirdScreen = () => {
   const reconnectDelay = 3000; // delay 5 seconds for the first reconnection
   let reconnectAttempts = 0
 
+
   const activeTransports = [];
 
   // const [socket, setSocket] = useState(null);
@@ -66,6 +67,7 @@ const SafebirdScreen = () => {
     let heartbeatIntervalId;
     let reconnectTimeoutId; // variable to hold reconnect timeout id
     let isComponentMounted = true; // Keep track of whether the component is mounted
+    let streamCheckInterval;
 
     async function initializeWebSocket() {
 
@@ -218,6 +220,27 @@ const SafebirdScreen = () => {
         log.error("[startWebrtcRecv] ERROR:", err);
         return;
       }
+
+      transport.on("connectionstatechange", async (state) => {
+        // Check if the connection state has changed to "failed" or "disconnected"
+        if (state === "failed" || state === "disconnected") {
+          if(isComponentMounted) {
+            console.log(`Transport connection state changed to ${state}`);
+            // Close any active transports
+            for (const transport of activeTransports) {
+              transport.close();
+            }
+            activeTransports.length = 0; // Clear the array
+
+            initializeWebSocket()
+            // Attempt to reconnect
+            // reconnectAttempts++;
+            // reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
+            // console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
+            console.log(`Attempt to reconnect...`);
+          }
+        }
+      });
     
       log("[startWebrtcRecv] WebRTC RECV transport created");
     
@@ -263,9 +286,7 @@ const SafebirdScreen = () => {
       // Start mediasoup-client's WebRTC consumer(s)
     
       const stream = new MediaStream();  
-      
-      let streamReceivedTimeout;
-    
+          
       if (useVideo) {
 
         const consumer = await transport.consume(webrtcConsumerOptions);
@@ -276,29 +297,29 @@ const SafebirdScreen = () => {
         // Update the videoTrack state
         setVideoTrack(new MediaStream([consumer.track]));
 
-        // Set a timeout for receiving the stream
-        streamReceivedTimeout = setTimeout(() => {
-          if (!isPlaying) {
-            console.log("HEHREHHERHEHRHEHREHEHRH")
-            setStatusMessage("Error in receiving SAFEBIRD view, trying to reconnect...");
-            socket.close(); // Close the websocket
-            initializeWebSocket(); // Attempt to reconnect
-          }
-        }, 5000); // 5 seconds
-
         // Check if the stream is being received
         if (stream.getVideoTracks().length > 0) {
           log('Stream received:', stream);
           setIsPlaying(true);
-          clearTimeout(streamReceivedTimeout);
         } else {
           log('No stream received');
         }
       }
+
+      return () => {
+        isComponentMounted = false; // Indicate that the component is no longer mounted
+        if (heartbeatIntervalId) {
+          clearInterval(heartbeatIntervalId);
+        }
+        
+      };
       
     }
+    
         
   }, []);
+
+
 
   function sendHeartbeat(socket) {
     if (socket && socket.readyState === WebSocket.OPEN) {
