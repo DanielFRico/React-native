@@ -323,7 +323,7 @@ const SafebirdScreen = () => {
 
   function sendHeartbeat(socket) {
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "HEARTBEAT" }));
+      socket.send(JSON.stringify({ source: "react-native", type: "HEARTBEAT" }));
     }
   }
 
