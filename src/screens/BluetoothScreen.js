@@ -44,16 +44,16 @@ const BluetoothScreen = () => {
                 PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
               ).then((result) => {
                 if (result) {
-                  console.log('User accept');
+                  console.log('User accepted');
                 } else {
-                  console.log('User refuse');
+                  console.log('User refused');
                 }
               });
             }
           });
         }
 
-        // Request for Bluetooth Scan permission
+        // Request Bluetooth Scan permission
         PermissionsAndroid.check(
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
         ).then((result) => {
@@ -64,9 +64,9 @@ const BluetoothScreen = () => {
               PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
             ).then((result) => {
               if (result) {
-                console.log('User accept Bluetooth Scan');
+                console.log('User accepted Bluetooth Scan');
               } else {
-                console.log('User refuse Bluetooth Scan');
+                console.log('User refused Bluetooth Scan');
               }
             });
           }
@@ -98,19 +98,14 @@ const BluetoothScreen = () => {
     };
   }, []);
 
-
-
   useEffect(() => {
     const discoverListener = BleManagerEmitter.addListener(
       'BleManagerDiscoverPeripheral',
       (device) => {
         console.log('Discovered device:', device);
 
-        if (!discoveredDevices[device.id]) {
-          setDiscoveredDevices((prevDevices) => ({
-            ...prevDevices,
-            [device.id]: device,
-          }));
+        if (!discoveredDevices.some((d) => d.id === device.id)) {
+          setDiscoveredDevices((prevDevices) => [...prevDevices, device]);
         }
       },
     );
@@ -119,7 +114,6 @@ const BluetoothScreen = () => {
       discoverListener.remove();
     };
   }, []);
-
 
   const startScan = () => {
     if (!isScanning) {
@@ -134,8 +128,14 @@ const BluetoothScreen = () => {
   };
 
   const connectToDevice = (device) => {
-    // Implement your logic to connect to the selected device
-    console.log('Connecting to device:', device);
+    BleManager.connect(device.id)
+      .then(() => {
+        console.log('Connected to device:', device);
+        // Implement your logic after successfully connecting to the device
+      })
+      .catch((error) => {
+        console.error('Connection error:', error);
+      });
   };
 
   return (
@@ -178,18 +178,31 @@ const BluetoothScreen = () => {
         </View>
 
         {/* Display discovered devices */}
-        {discoveredDevices.map((device) => (
-          <TouchableOpacity
-            key={device.id}
-            style={styles.deviceButton}
-            onPress={() => connectToDevice(device)}
-          >
-            <Text style={styles.deviceButtonText}>
-              {device.advertising.localName || 'Unknown Device'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-
+        {discoveredDevices
+          .filter((device) => device.advertising.isConnectable)
+          .reduce((uniqueDevices, device) => {
+            const duplicateIndex = uniqueDevices.findIndex(
+              (d) =>
+                d.advertising.localName === device.advertising.localName &&
+                JSON.stringify(d.advertising.manufacturerData) ===
+                  JSON.stringify(device.advertising.manufacturerData),
+            );
+            if (duplicateIndex === -1) {
+              uniqueDevices.push(device);
+            }
+            return uniqueDevices;
+          }, [])
+          .map((device) => (
+            <TouchableOpacity
+              key={device.id}
+              style={styles.deviceButton}
+              onPress={() => connectToDevice(device)}
+            >
+              <Text style={styles.deviceButtonText}>
+                {device.advertising.localName || 'Unknown Device'}
+              </Text>
+            </TouchableOpacity>
+          ))}
       </ScrollView>
     </SafeAreaView>
   );
