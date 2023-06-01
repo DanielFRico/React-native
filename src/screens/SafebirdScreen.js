@@ -1,7 +1,7 @@
 const CONFIG = require("../../config");
 const log = require("../../logging");
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 const MediasoupClient = require("mediasoup-client");
 import { registerGlobals } from 'react-native-webrtc';
 import { RTCView } from 'react-native-webrtc';
@@ -34,11 +34,18 @@ function socketRequest(socket, message) {
 
 
 const SafebirdScreen = () => {
-  socket = new WebSocket(CONFIG.http);
+  const reconnectDelay = 3000; // delay 5 seconds for the first reconnection
+  let reconnectAttempts = 0
+
+
+  const activeTransports = [];
+
   // const [socket, setSocket] = useState(null);
   
   const [videoTrack, setVideoTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("SAFEBIRD view loading ...");
+
   const videoRef = React.createRef();
 
   WebSocket.prototype.sendAsync = function (data) {
@@ -56,37 +63,87 @@ const SafebirdScreen = () => {
   let device;
 
   useEffect(() => {
+    
+    let heartbeatIntervalId;
+    let reconnectTimeoutId; // variable to hold reconnect timeout id
+    let isComponentMounted = true; // Keep track of whether the component is mounted
+    let streamCheckInterval;
+    let socket;
 
-    // Setup a single 'onmessage' event listener for the socket
-    // This implementation assigns a unique ID to each request, and it 
-    // stores the pending requests in a pendingRequests Map. When a response 
-    // is received, it looks up the corresponding request by its ID and 
-    // resolves or rejects the Promise accordingly.
-    socket.onmessage = (event) => {
-      const response = JSON.parse(event.data);
-      const { requestId, error } = response;
+    async function initializeWebSocket() {
 
-      const pendingRequest = pendingRequests.get(requestId);
+      socket = new WebSocket(CONFIG.http);
 
-      if (pendingRequest) {
-        const { resolve, reject } = pendingRequest;
+      // Setup heartbeat sender
+      heartbeatIntervalId = setInterval(() => sendHeartbeat(socket), 1000);
 
-        if (error) {
-          reject(error);
+      // Setup a single 'onmessage' event listener for the socket
+      // This implementation assigns a unique ID to each request, and it 
+      // stores the pending requests in a pendingRequests Map. When a response 
+      // is received, it looks up the corresponding request by its ID and 
+      // resolves or rejects the Promise accordingly.
+      socket.onmessage = (event) => {
+        const response = JSON.parse(event.data);
+        const { requestId, error } = response;
+
+        const pendingRequest = pendingRequests.get(requestId);
+
+        if (pendingRequest) {
+          const { resolve, reject } = pendingRequest;
+
+          if (error) {
+            reject(error);
+          } else {
+            resolve(response);
+          }
+
+          pendingRequests.delete(requestId);
         } else {
-          resolve(response);
+          console.error('Received response for unknown request ID:', requestId);
         }
+      };
 
-        pendingRequests.delete(requestId);
-      } else {
-        console.error('Received response for unknown request ID:', requestId);
+      socket.onopen = async () => {
+        console.log('Connected to server');
+        reconnectAttempts = 0; // reset the counter
+        await startWebRTC()
+      };
+
+      socket.onclose = async (event) => {
+        console.log(`Socket closed with code ${event.code}`);
+
+        // Close any active transports
+        for (const transport of activeTransports) {
+          transport.close();
+        }
+        activeTransports.length = 0; // Clear the array
+        
+        if(isComponentMounted) { // Only attempt to reconnect if the component is still mounted
+          reconnectAttempts++;
+          reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
+          console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
+        }
+      };
+
+    }
+
+    initializeWebSocket();
+
+     // Clear the heartbeat interval and reconnect timeout when the component unmounts.
+     return () => {
+      isComponentMounted = false; // Indicate that the component is no longer mounted
+      if (heartbeatIntervalId) {
+        clearInterval(heartbeatIntervalId);
+      }
+      if (reconnectTimeoutId) {
+        clearTimeout(reconnectTimeoutId);
+      }
+
+      if (socket) {
+        socket.close();
       }
     };
 
-    socket.onopen = async () => {
-      console.log('Connected to server');
-      await startWebRTC()
-    };
 
     async function startWebRTC() {
       log("[startWebRTC] Start WebRTC transmission from browser to mediasoup");
@@ -163,10 +220,32 @@ const SafebirdScreen = () => {
       let transport;
       try {
         transport = device.createRecvTransport(webrtcTransportOptions);
+        activeTransports.push(transport); // Add the transport to the array
       } catch (err) {
         log.error("[startWebrtcRecv] ERROR:", err);
         return;
       }
+
+      transport.on("connectionstatechange", async (state) => {
+        // Check if the connection state has changed to "failed" or "disconnected"
+        if (state === "failed" || state === "disconnected") {
+          if(isComponentMounted) {
+            console.log(`Transport connection state changed to ${state}`);
+            // Close any active transports
+            for (const transport of activeTransports) {
+              transport.close();
+            }
+            activeTransports.length = 0; // Clear the array
+
+            initializeWebSocket()
+            // Attempt to reconnect
+            // reconnectAttempts++;
+            // reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
+            // console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
+            console.log(`Attempt to reconnect...`);
+          }
+        }
+      });
     
       log("[startWebrtcRecv] WebRTC RECV transport created");
     
@@ -211,8 +290,8 @@ const SafebirdScreen = () => {
 
       // Start mediasoup-client's WebRTC consumer(s)
     
-      const stream = new MediaStream();    
-    
+      const stream = new MediaStream();  
+          
       if (useVideo) {
 
         const consumer = await transport.consume(webrtcConsumerOptions);
@@ -231,23 +310,39 @@ const SafebirdScreen = () => {
           log('No stream received');
         }
       }
+
+      return () => {
+        isComponentMounted = false; // Indicate that the component is no longer mounted
+        if (heartbeatIntervalId) {
+          clearInterval(heartbeatIntervalId);
+        }
+        
+      };
       
     }
+    
         
   }, []);
 
+  function sendHeartbeat(socket) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ source: "react-native", type: "HEARTBEAT" }));
+    }
+  }
+
   return (
     <View style={styles.container}>
-      {videoTrack && (
-        <RTCView
-          style={styles.video}
-          streamURL={videoTrack.toURL()}
-          objectFit="cover"
-        />
-      )}
-    </View>
+  <Text>{`${statusMessage}`}</Text> 
+  {videoTrack && (
+    <RTCView
+      style={styles.video}
+      streamURL={videoTrack.toURL()}
+      objectFit="cover"
+    />
+  )}
+</View>
   );
-};
+};  
 
 const styles = StyleSheet.create({
   container: {
