@@ -72,6 +72,11 @@ const SafebirdScreen = () => {
 
     async function initializeWebSocket() {
 
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
+
+
       socket = new WebSocket(CONFIG.http);
 
       // Setup heartbeat sender
@@ -118,7 +123,7 @@ const SafebirdScreen = () => {
         }
         activeTransports.length = 0; // Clear the array
         
-        if(isComponentMounted) { // Only attempt to reconnect if the component is still mounted
+        if(isComponentMounted  && !event.wasClean) { // Only attempt to reconnect if the component is still mounted
           reconnectAttempts++;
           reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
           console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
@@ -130,19 +135,19 @@ const SafebirdScreen = () => {
     initializeWebSocket();
 
      // Clear the heartbeat interval and reconnect timeout when the component unmounts.
-     return () => {
-      isComponentMounted = false; // Indicate that the component is no longer mounted
-      if (heartbeatIntervalId) {
-        clearInterval(heartbeatIntervalId);
-      }
-      if (reconnectTimeoutId) {
-        clearTimeout(reconnectTimeoutId);
-      }
+    return () => {
+    isComponentMounted = false; // Indicate that the component is no longer mounted
+    if (heartbeatIntervalId) {
+      clearInterval(heartbeatIntervalId);
+    }
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+    }
 
-      if (socket) {
-        socket.close();
-      }
-    };
+    if (socket) {
+      socket.close();
+    }
+  };
 
 
     async function startWebRTC() {
