@@ -68,6 +68,7 @@ const SafebirdScreen = () => {
     let reconnectTimeoutId; // variable to hold reconnect timeout id
     let isComponentMounted = true; // Keep track of whether the component is mounted
     let streamCheckInterval;
+    let socket;
 
     async function initializeWebSocket() {
 
@@ -136,6 +137,10 @@ const SafebirdScreen = () => {
       }
       if (reconnectTimeoutId) {
         clearTimeout(reconnectTimeoutId);
+      }
+
+      if (socket) {
+        socket.close();
       }
     };
 
