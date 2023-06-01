@@ -74,7 +74,7 @@ const SafebirdScreen = () => {
       socket = new WebSocket(CONFIG.http);
 
       // Setup heartbeat sender
-      heartbeatIntervalId = setInterval(() => sendHeartbeat(socket), 500);
+      heartbeatIntervalId = setInterval(() => sendHeartbeat(socket), 1000);
 
       // Setup a single 'onmessage' event listener for the socket
       // This implementation assigns a unique ID to each request, and it 
@@ -318,8 +318,6 @@ const SafebirdScreen = () => {
     
         
   }, []);
-
-
 
   function sendHeartbeat(socket) {
     if (socket && socket.readyState === WebSocket.OPEN) {
