@@ -84,6 +84,7 @@ const BluetoothScreen = () => {
 
   const [isScanning, setIsScanning] = useState(false);
   const [discoveredDevices, setDiscoveredDevices] = useState([]);
+  const [connectedDevice, setConnectedDevice] = useState(null);
 
   useEffect(() => {
     let stopListener = BleManagerEmitter.addListener(
@@ -127,15 +128,16 @@ const BluetoothScreen = () => {
     }
   };
 
-  const connectToDevice = (device) => {
-    BleManager.connect(device.id)
-      .then(() => {
-        console.log('Connected to device:', device);
-        // Implement your logic after successfully connecting to the device
-      })
-      .catch((error) => {
-        console.error('Connection error:', error);
-      });
+  const sendConnectionRequest = async (device) => {
+    console.log('Sending connection request to device:', device);
+
+    try {
+      await BleManager.connect(device.id);
+      console.log('Connected to device:', device);
+      setConnectedDevice(device);
+    } catch (error) {
+      console.error('Error connecting to device:', error);
+    }
   };
 
   return (
@@ -195,12 +197,18 @@ const BluetoothScreen = () => {
           .map((device) => (
             <TouchableOpacity
               key={device.id}
-              style={styles.deviceButton}
-              onPress={() => connectToDevice(device)}
+              style={[
+                styles.deviceButton,
+                connectedDevice?.id === device.id && styles.connectedDeviceButton,
+              ]}
+              onPress={() => sendConnectionRequest(device)}
             >
               <Text style={styles.deviceButtonText}>
                 {device.advertising.localName || 'Unknown Device'}
               </Text>
+              {connectedDevice?.id === device.id && (
+                <Text style={styles.connectedDeviceText}>Connected</Text>
+              )}
             </TouchableOpacity>
           ))}
       </ScrollView>
@@ -218,37 +226,41 @@ const styles = StyleSheet.create({
 
   buttonStyle: {
     backgroundColor: '#307ecc',
-    borderWidth: 0,
-    color: '#FFFFFF',
-    borderColor: '#307ecc',
-    height: 40,
-    alignItems: 'center',
-    borderRadius: 30,
-    marginLeft: 35,
-    marginRight: 35,
-    marginTop: 15,
-  },
-  buttonTextStyle: {
-    color: '#FFFFFF',
+    paddingHorizontal: 20,
     paddingVertical: 10,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginVertical: 10,
+  },
+
+  buttonTextStyle: {
+    color: '#ffffff',
     fontSize: 16,
+    textAlign: 'center',
   },
 
   deviceButton: {
-    backgroundColor: '#eaeaea',
-    borderWidth: 0,
-    color: '#000000',
-    borderColor: '#eaeaea',
-    height: 40,
-    alignItems: 'center',
-    borderRadius: 5,
-    marginHorizontal: 35,
-    marginBottom: 10,
-    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginVertical: 10,
   },
+
+  connectedDeviceButton: {
+    backgroundColor: '#00ff00',
+  },
+
   deviceButtonText: {
     color: '#000000',
     fontSize: 16,
+  },
+
+  connectedDeviceText: {
+    color: '#ffffff',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 
