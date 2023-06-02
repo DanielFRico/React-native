@@ -44,7 +44,7 @@ const SafebirdScreen = () => {
   
   const [videoTrack, setVideoTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("SAFEBIRD view loading ...");
+  const [statusMessage, setStatusMessage] = useState("Connecting to SAFEBIRD server...");
 
   const videoRef = React.createRef();
 
@@ -120,6 +120,7 @@ const SafebirdScreen = () => {
 
       socket.onopen = async () => {
         console.log('Connected to server');
+        setStatusMessage("Waiting for SAFEBIRD live stream...");
         reconnectAttempts = 0; // reset the counter
         await startWebRTC()
       };
@@ -144,6 +145,7 @@ const SafebirdScreen = () => {
         
         if(isComponentMounted && !event.wasClean) {
           reconnectAttempts++;
+          setStatusMessage("SAFEBIRD server disconnected, trying to reconnect...");
           reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
           console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
         }
@@ -336,6 +338,10 @@ const SafebirdScreen = () => {
         if (stream.getVideoTracks().length > 0) {
           log('Stream received:', stream);
           setIsPlaying(true);
+          // Delay the removal of the status message
+          setTimeout(() => {
+            setStatusMessage("");
+          }, 3000); // delay of 3 seconds, adjust as needed
         } else {
           log('No stream received');
         }
@@ -362,15 +368,15 @@ const SafebirdScreen = () => {
 
   return (
     <View style={styles.container}>
-  <Text>{`${statusMessage}`}</Text> 
-  {videoTrack && (
-    <RTCView
-      style={styles.video}
-      streamURL={videoTrack.toURL()}
-      objectFit="cover"
-    />
-  )}
-</View>
+      <Text style={styles.statusMessage}>{statusMessage}</Text> 
+      {videoTrack && (
+        <RTCView
+          style={styles.video}
+          streamURL={videoTrack.toURL()}
+          objectFit="cover"
+        />
+      )}
+    </View>
   );
 };  
 
@@ -384,7 +390,16 @@ const styles = StyleSheet.create({
   video: {
     width: '100%',
     height: '100%',
+    position: 'absolute',
   },
+  statusMessage: {
+    position: 'absolute',
+    zIndex: 1, // Ensure it floats on top of the video
+    color: '#fff', // Making text color white for visibility on dark/black background
+    fontSize: 16, // Making font size smaller, adjust to your preference
+    left: 10, // Left margin
+    right: 10, // Right margin
+    textAlign: 'center', // Center the text
+  }
 });
-
 export default SafebirdScreen;
