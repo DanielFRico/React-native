@@ -1,6 +1,6 @@
 const CONFIG = require("../../config");
 const log = require("../../logging");
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 const MediasoupClient = require("mediasoup-client");
 import { registerGlobals } from 'react-native-webrtc';
@@ -48,6 +48,8 @@ const SafebirdScreen = () => {
 
   const videoRef = React.createRef();
 
+  const heartbeatIntervalIdRef = useRef(null);
+
   WebSocket.prototype.sendAsync = function (data) {
     return new Promise((resolve, reject) => {
       this.send(JSON.stringify(data), (err) => {
@@ -65,22 +67,30 @@ const SafebirdScreen = () => {
   useEffect(() => {
     
     let heartbeatIntervalId;
-    let reconnectTimeoutId; // variable to hold reconnect timeout id
+    let reconnectTimeoutId = null; // variable to hold reconnect timeout id
     let isComponentMounted = true; // Keep track of whether the component is mounted
     let streamCheckInterval;
     let socket;
 
     async function initializeWebSocket() {
 
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.close();
-      }
-
+      // if (socket && socket.readyState === WebSocket.OPEN) {
+      //   socket.close();
+      // }
 
       socket = new WebSocket(CONFIG.http);
 
+
+      // Clear any previous heartbeat interval
+      if (heartbeatIntervalIdRef.current) {
+        clearInterval(heartbeatIntervalIdRef.current);
+      }
+
       // Setup heartbeat sender
-      heartbeatIntervalId = setInterval(() => sendHeartbeat(socket), 1000);
+      heartbeatIntervalIdRef.current = setInterval(() => sendHeartbeat(socket), 1000);
+
+      // Setup heartbeat sender
+      // heartbeatIntervalId = setInterval(() => sendHeartbeat(socket), 1000);
 
       // Setup a single 'onmessage' event listener for the socket
       // This implementation assigns a unique ID to each request, and it 
@@ -117,13 +127,22 @@ const SafebirdScreen = () => {
       socket.onclose = async (event) => {
         console.log(`Socket closed with code ${event.code}`);
 
+        if (heartbeatIntervalIdRef.current) {
+          clearInterval(heartbeatIntervalIdRef.current);
+        }
+    
+        if (reconnectTimeoutId) {
+          clearTimeout(reconnectTimeoutId);
+          reconnectTimeoutId = null;
+        } 
+
         // Close any active transports
         for (const transport of activeTransports) {
           transport.close();
         }
         activeTransports.length = 0; // Clear the array
         
-        if(isComponentMounted  && !event.wasClean) { // Only attempt to reconnect if the component is still mounted
+        if(isComponentMounted && !event.wasClean) {
           reconnectAttempts++;
           reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
           console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
@@ -137,11 +156,17 @@ const SafebirdScreen = () => {
      // Clear the heartbeat interval and reconnect timeout when the component unmounts.
     return () => {
     isComponentMounted = false; // Indicate that the component is no longer mounted
-    if (heartbeatIntervalId) {
-      clearInterval(heartbeatIntervalId);
+    // if (heartbeatIntervalId) {
+    //   clearInterval(heartbeatIntervalId);
+    // }
+
+    if (heartbeatIntervalIdRef.current) {
+      clearInterval(heartbeatIntervalIdRef.current);
     }
+
     if (reconnectTimeoutId) {
       clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = null;
     }
 
     if (socket) {

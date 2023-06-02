@@ -8,6 +8,6 @@ module.exports = {
     wsPingTimeout: 5000,
   },
 
-  http: "ws://172.17.0.1:8080",
+  http: "ws://192.168.178.108:8080",
 
 };
