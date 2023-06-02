@@ -36,17 +36,10 @@ function socketRequest(socket, message) {
 const SafebirdScreen = () => {
   const reconnectDelay = 3000; // delay 5 seconds for the first reconnection
   let reconnectAttempts = 0
-
-
-  const activeTransports = [];
-
-  // const [socket, setSocket] = useState(null);
-  
+  const activeTransports = [];  
   const [videoTrack, setVideoTrack] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Connecting to SAFEBIRD server...");
 
-  const videoRef = React.createRef();
 
   const heartbeatIntervalIdRef = useRef(null);
 
@@ -66,17 +59,11 @@ const SafebirdScreen = () => {
 
   useEffect(() => {
     
-    let heartbeatIntervalId;
     let reconnectTimeoutId = null; // variable to hold reconnect timeout id
     let isComponentMounted = true; // Keep track of whether the component is mounted
-    let streamCheckInterval;
     let socket;
 
     async function initializeWebSocket() {
-
-      // if (socket && socket.readyState === WebSocket.OPEN) {
-      //   socket.close();
-      // }
 
       socket = new WebSocket(CONFIG.http);
 
@@ -89,14 +76,6 @@ const SafebirdScreen = () => {
       // Setup heartbeat sender
       heartbeatIntervalIdRef.current = setInterval(() => sendHeartbeat(socket), 1000);
 
-      // Setup heartbeat sender
-      // heartbeatIntervalId = setInterval(() => sendHeartbeat(socket), 1000);
-
-      // Setup a single 'onmessage' event listener for the socket
-      // This implementation assigns a unique ID to each request, and it 
-      // stores the pending requests in a pendingRequests Map. When a response 
-      // is received, it looks up the corresponding request by its ID and 
-      // resolves or rejects the Promise accordingly.
       socket.onmessage = (event) => {
         const response = JSON.parse(event.data);
         const { requestId, error } = response;
@@ -158,9 +137,6 @@ const SafebirdScreen = () => {
      // Clear the heartbeat interval and reconnect timeout when the component unmounts.
     return () => {
     isComponentMounted = false; // Indicate that the component is no longer mounted
-    // if (heartbeatIntervalId) {
-    //   clearInterval(heartbeatIntervalId);
-    // }
 
     if (heartbeatIntervalIdRef.current) {
       clearInterval(heartbeatIntervalIdRef.current);
@@ -270,10 +246,6 @@ const SafebirdScreen = () => {
             activeTransports.length = 0; // Clear the array
 
             initializeWebSocket()
-            // Attempt to reconnect
-            // reconnectAttempts++;
-            // reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
-            // console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
             console.log(`Attempt to reconnect...`);
           }
         }
@@ -337,7 +309,6 @@ const SafebirdScreen = () => {
         // Check if the stream is being received
         if (stream.getVideoTracks().length > 0) {
           log('Stream received:', stream);
-          setIsPlaying(true);
           // Delay the removal of the status message
           setTimeout(() => {
             setStatusMessage("");
