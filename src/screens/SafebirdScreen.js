@@ -5,6 +5,7 @@ import { StyleSheet, View, Text } from 'react-native';
 const MediasoupClient = require("mediasoup-client");
 import { registerGlobals } from 'react-native-webrtc';
 import { RTCView } from 'react-native-webrtc';
+import KeepAwake from 'react-native-keep-awake';
 
 registerGlobals(); // Register WebRTC globals
 
@@ -58,6 +59,8 @@ const SafebirdScreen = () => {
   let device;
 
   useEffect(() => {
+
+    KeepAwake.activate(); // prevent the device from going to sleep
     
     let reconnectTimeoutId = null; // variable to hold reconnect timeout id
     let isComponentMounted = true; // Keep track of whether the component is mounted
@@ -150,6 +153,8 @@ const SafebirdScreen = () => {
     if (socket) {
       socket.close();
     }
+
+    KeepAwake.deactivate(); // allow the device to go to sleep
   };
 
 
