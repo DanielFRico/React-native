@@ -68,9 +68,8 @@ const SafebirdScreen = () => {
 
     async function initializeWebSocket() {
 
-      socket = new WebSocket(CONFIG.http);
-
-
+      socket = new WebSocket("ws://"+CONFIG.websocket.http.ip+":"+CONFIG.websocket.http.port);
+      
       // Clear any previous heartbeat interval
       if (heartbeatIntervalIdRef.current) {
         clearInterval(heartbeatIntervalIdRef.current);
