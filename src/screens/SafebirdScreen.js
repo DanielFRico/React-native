@@ -1,10 +1,11 @@
 const CONFIG = require("../../config");
 const log = require("../../logging");
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, View, Text } from 'react-native';
 const MediasoupClient = require("mediasoup-client");
 import { registerGlobals } from 'react-native-webrtc';
 import { RTCView } from 'react-native-webrtc';
+import KeepAwake from 'react-native-keep-awake';
 
 registerGlobals(); // Register WebRTC globals
 
@@ -34,12 +35,14 @@ function socketRequest(socket, message) {
 
 
 const SafebirdScreen = () => {
-  socket = new WebSocket(CONFIG.http);
-  // const [socket, setSocket] = useState(null);
-  
+  const reconnectDelay = 3000; // delay 5 seconds for the first reconnection
+  let reconnectAttempts = 0
+  const activeTransports = [];  
   const [videoTrack, setVideoTrack] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const videoRef = React.createRef();
+  const [statusMessage, setStatusMessage] = useState("Connecting to SAFEBIRD server...");
+
+
+  const heartbeatIntervalIdRef = useRef(null);
 
   WebSocket.prototype.sendAsync = function (data) {
     return new Promise((resolve, reject) => {
@@ -57,36 +60,102 @@ const SafebirdScreen = () => {
 
   useEffect(() => {
 
-    // Setup a single 'onmessage' event listener for the socket
-    // This implementation assigns a unique ID to each request, and it 
-    // stores the pending requests in a pendingRequests Map. When a response 
-    // is received, it looks up the corresponding request by its ID and 
-    // resolves or rejects the Promise accordingly.
-    socket.onmessage = (event) => {
-      const response = JSON.parse(event.data);
-      const { requestId, error } = response;
+    KeepAwake.activate(); // prevent the device from going to sleep
+    
+    let reconnectTimeoutId = null; // variable to hold reconnect timeout id
+    let isComponentMounted = true; // Keep track of whether the component is mounted
+    let socket;
 
-      const pendingRequest = pendingRequests.get(requestId);
+    async function initializeWebSocket() {
 
-      if (pendingRequest) {
-        const { resolve, reject } = pendingRequest;
-
-        if (error) {
-          reject(error);
-        } else {
-          resolve(response);
-        }
-
-        pendingRequests.delete(requestId);
-      } else {
-        console.error('Received response for unknown request ID:', requestId);
+      socket = new WebSocket("ws://"+CONFIG.websocket.http.ip+":"+CONFIG.websocket.http.port);
+      
+      // Clear any previous heartbeat interval
+      if (heartbeatIntervalIdRef.current) {
+        clearInterval(heartbeatIntervalIdRef.current);
       }
-    };
 
-    socket.onopen = async () => {
-      console.log('Connected to server');
-      await startWebRTC()
-    };
+      // Setup heartbeat sender
+      heartbeatIntervalIdRef.current = setInterval(() => sendHeartbeat(socket), 1000);
+
+      socket.onmessage = (event) => {
+        const response = JSON.parse(event.data);
+        const { requestId, error } = response;
+
+        const pendingRequest = pendingRequests.get(requestId);
+
+        if (pendingRequest) {
+          const { resolve, reject } = pendingRequest;
+
+          if (error) {
+            reject(error);
+          } else {
+            resolve(response);
+          }
+
+          pendingRequests.delete(requestId);
+        } else {
+          console.error('Received response for unknown request ID:', requestId);
+        }
+      };
+
+      socket.onopen = async () => {
+        console.log('Connected to server');
+        setStatusMessage("Waiting for SAFEBIRD live stream...");
+        reconnectAttempts = 0; // reset the counter
+        await startWebRTC()
+      };
+
+      socket.onclose = async (event) => {
+        console.log(`Socket closed with code ${event.code}`);
+
+        if (heartbeatIntervalIdRef.current) {
+          clearInterval(heartbeatIntervalIdRef.current);
+        }
+    
+        if (reconnectTimeoutId) {
+          clearTimeout(reconnectTimeoutId);
+          reconnectTimeoutId = null;
+        } 
+
+        // Close any active transports
+        for (const transport of activeTransports) {
+          transport.close();
+        }
+        activeTransports.length = 0; // Clear the array
+        
+        if(isComponentMounted && !event.wasClean) {
+          reconnectAttempts++;
+          setStatusMessage("SAFEBIRD server disconnected, trying to reconnect...");
+          reconnectTimeoutId = setTimeout(initializeWebSocket, reconnectDelay * reconnectAttempts);
+          console.log(`Attempt to reconnect... (attempt number ${reconnectAttempts})`);
+        }
+      };
+
+    }
+
+    initializeWebSocket();
+
+     // Clear the heartbeat interval and reconnect timeout when the component unmounts.
+    return () => {
+    isComponentMounted = false; // Indicate that the component is no longer mounted
+
+    if (heartbeatIntervalIdRef.current) {
+      clearInterval(heartbeatIntervalIdRef.current);
+    }
+
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = null;
+    }
+
+    if (socket) {
+      socket.close();
+    }
+
+    KeepAwake.deactivate(); // allow the device to go to sleep
+  };
+
 
     async function startWebRTC() {
       log("[startWebRTC] Start WebRTC transmission from browser to mediasoup");
@@ -163,10 +232,28 @@ const SafebirdScreen = () => {
       let transport;
       try {
         transport = device.createRecvTransport(webrtcTransportOptions);
+        activeTransports.push(transport); // Add the transport to the array
       } catch (err) {
         log.error("[startWebrtcRecv] ERROR:", err);
         return;
       }
+
+      transport.on("connectionstatechange", async (state) => {
+        // Check if the connection state has changed to "failed" or "disconnected"
+        if (state === "failed" || state === "disconnected") {
+          if(isComponentMounted) {
+            console.log(`Transport connection state changed to ${state}`);
+            // Close any active transports
+            for (const transport of activeTransports) {
+              transport.close();
+            }
+            activeTransports.length = 0; // Clear the array
+
+            initializeWebSocket()
+            console.log(`Attempt to reconnect...`);
+          }
+        }
+      });
     
       log("[startWebrtcRecv] WebRTC RECV transport created");
     
@@ -211,8 +298,8 @@ const SafebirdScreen = () => {
 
       // Start mediasoup-client's WebRTC consumer(s)
     
-      const stream = new MediaStream();    
-    
+      const stream = new MediaStream();  
+          
       if (useVideo) {
 
         const consumer = await transport.consume(webrtcConsumerOptions);
@@ -226,18 +313,37 @@ const SafebirdScreen = () => {
         // Check if the stream is being received
         if (stream.getVideoTracks().length > 0) {
           log('Stream received:', stream);
-          setIsPlaying(true);
+          // Delay the removal of the status message
+          setTimeout(() => {
+            setStatusMessage("");
+          }, 3000); // delay of 3 seconds, adjust as needed
         } else {
           log('No stream received');
         }
       }
+
+      return () => {
+        isComponentMounted = false; // Indicate that the component is no longer mounted
+        if (heartbeatIntervalId) {
+          clearInterval(heartbeatIntervalId);
+        }
+        
+      };
       
     }
+    
         
   }, []);
 
+  function sendHeartbeat(socket) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ source: "react-native", type: "HEARTBEAT" }));
+    }
+  }
+
   return (
     <View style={styles.container}>
+      <Text style={styles.statusMessage}>{statusMessage}</Text> 
       {videoTrack && (
         <RTCView
           style={styles.video}
@@ -247,7 +353,7 @@ const SafebirdScreen = () => {
       )}
     </View>
   );
-};
+};  
 
 const styles = StyleSheet.create({
   container: {
@@ -259,7 +365,16 @@ const styles = StyleSheet.create({
   video: {
     width: '100%',
     height: '100%',
+    position: 'absolute',
   },
+  statusMessage: {
+    position: 'absolute',
+    zIndex: 1, // Ensure it floats on top of the video
+    color: '#fff', // Making text color white for visibility on dark/black background
+    fontSize: 16, // Making font size smaller, adjust to your preference
+    left: 10, // Left margin
+    right: 10, // Right margin
+    textAlign: 'center', // Center the text
+  }
 });
-
 export default SafebirdScreen;
