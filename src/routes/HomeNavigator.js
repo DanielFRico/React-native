@@ -6,7 +6,9 @@ import BluetoothScreen from "../screens/BluetoothScreen";
 import BluetoothScanScreen from "../screens/BluetoothScanScreen";
 import ChooseSafeBirdScreen from "../screens/ChooseSafeBirdScreen";
 import SafeBirdDevicesScreen from "../screens/SafeBirdDevicesScreen";
-import ConnectionScreen from "../screens/ConnectionScreen"; // Import the ConnectionScreen
+import ConnectionScreen from "../screens/ConnectionScreen"; 
+
+
 export default function HomeNavigator() {
   const HomeStack = createStackNavigator();
   return (
@@ -55,7 +57,6 @@ export default function HomeNavigator() {
         component={SafeBirdDevicesScreen}
         options={{ title: "SafeBird Devices" }}
       />
-      {/* Add more screens if needed */}
     </HomeStack.Navigator>
   );
 }

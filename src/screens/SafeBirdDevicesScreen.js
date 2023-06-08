@@ -7,6 +7,7 @@ const SafeBirdDevicesScreen = () => {
   const navigation = useNavigation();
 
   useEffect(() => {
+    // Initialize BleManager
     BleManager.start({ showAlert: false }).then(() => {
       console.log('BleManager initialized');
     });
@@ -15,6 +16,7 @@ const SafeBirdDevicesScreen = () => {
   const requestLocationPermission = async () => {
     if (Platform.OS === 'android') {
       try {
+        // Request location permission for Android
         const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           console.log('Location permission granted');
@@ -26,14 +28,17 @@ const SafeBirdDevicesScreen = () => {
         console.error('Failed to request location permission:', error);
       }
     } else {
+      // For iOS, directly start scanning
       startScan();
     }
   };
 
   const startScan = () => {
+    // Start scanning for Bluetooth devices
     BleManager.scan([], 5, true)
       .then(() => {
         console.log('Scan started');
+        // Navigate to the BluetoothScanScreen upon successful scanning
         navigation.navigate('BluetoothScanScreen');
       })
       .catch((error) => {
@@ -42,16 +47,20 @@ const SafeBirdDevicesScreen = () => {
   };
 
   const handlePlusButtonPress = async () => {
+    // Check if Bluetooth is enabled
     const isEnabled = await BleManager.checkState();
     if (isEnabled === 'off') {
+      // Prompt the user to enable Bluetooth
       const promptResult = await BleManager.enableBluetooth();
       if (promptResult) {
         console.log('Bluetooth enabled');
+        // Request location permission to start scanning
         requestLocationPermission();
       } else {
         console.log('Bluetooth not enabled');
       }
     } else {
+      // Bluetooth is already enabled, request location permission
       requestLocationPermission();
     }
   };

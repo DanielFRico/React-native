@@ -12,6 +12,7 @@ const ConnectionScreen = ({ route }) => {
   console.log('Device Name:', deviceName);
 
   useEffect(() => {
+    // Start the BleManager when the component mounts
     BleManager.start({ showAlert: false });
   }, []);
 
@@ -27,6 +28,7 @@ const ConnectionScreen = ({ route }) => {
         console.log('Peripheral UUID:', peripheral.id); 
       });
   
+      // Find the selected peripheral by its name
       const selectedPeripheral = peripherals.find(peripheral => peripheral.name === deviceName);
       if (selectedPeripheral) {
         connectToPeripheral(selectedPeripheral);
@@ -36,15 +38,17 @@ const ConnectionScreen = ({ route }) => {
     });
   };
   
-
+  // Function to connect/disconnect to the peripheral
   const connectToPeripheral = peripheral => {
     if (peripheral.connected) {
+      // If already connected, disconnect from the peripheral
       BleManager.disconnect(peripheral.id).then(() => {
         peripheral.connected = false;
         setConnected(false);
         setConnectionStatus(`Disconnected from ${peripheral.name}`);
       });
     } else {
+      // If not connected, connect to the peripheral
       BleManager.connect(peripheral.id)
         .then(() => {
           let peripheralResponse = peripherals.get(peripheral.id);
@@ -60,6 +64,7 @@ const ConnectionScreen = ({ route }) => {
 
       /* Read current RSSI value */
       setTimeout(() => {
+        // Retrieve services of the connected peripheral
         BleManager.retrieveServices(peripheral.id)
           .then(peripheralData => {
             console.log('Peripheral services:', peripheralData);
