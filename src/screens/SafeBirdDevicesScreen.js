@@ -73,7 +73,7 @@ const SafeBirdDevicesScreen = () => {
         blue, press the plus button on the phone.
       </Text>
       <View style={styles.logoContainer}>
-        <Image source={require('../../assets/logo.png')} style={styles.logoImage} />
+        <Image source={require('../../assets/ConnectionIcone.png')} style={styles.logoImage} />
       </View>
       <TouchableOpacity style={styles.plusButton} onPress={handlePlusButtonPress}>
         <Text style={styles.plusButtonText}>+</Text>
@@ -109,6 +109,7 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 100,
     height: 100,
+    marginTop : 30
   },
   plusButton: {
     backgroundColor: '#f5f5f5',
