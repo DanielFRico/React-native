@@ -26,8 +26,8 @@ const ConnectionScreen = ({ route }) => {
         console.log('Peripheral RSSI:', peripheral.rssi);
         console.log('Peripheral UUID:', peripheral.id); 
       });
-
-      const selectedPeripheral = peripherals.find(peripheral => peripheral.name === 'Find Me');
+  
+      const selectedPeripheral = peripherals.find(peripheral => peripheral.name === deviceName);
       if (selectedPeripheral) {
         connectToPeripheral(selectedPeripheral);
       } else {
@@ -35,6 +35,7 @@ const ConnectionScreen = ({ route }) => {
       }
     });
   };
+  
 
   const connectToPeripheral = peripheral => {
     if (peripheral.connected) {
