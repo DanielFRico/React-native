@@ -1,79 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 import LogoImage from '../../assets/logo.png';
 
-const ConnectionScreen = ({ route }) => {
+const ConnectionScreen = ({ route, navigation }) => {
   const { deviceName } = route.params;
   const [connectionStatus, setConnectionStatus] = useState('');
   const [connected, setConnected] = useState(false);
-  const [peripherals, setPeripherals] = useState(new Map());
-
-  console.log('Device Name:', deviceName);
 
   useEffect(() => {
     // Start the BleManager when the component mounts
     BleManager.start({ showAlert: false });
   }, []);
 
-  const handleConnectPress = () => {
-    BleManager.getDiscoveredPeripherals([]).then(peripherals => {
-      console.log('Discovered Peripherals:');
-      peripherals.forEach(peripheral => {
-        console.log('Peripheral:', peripheral);
-        console.log('Peripheral Name:', peripheral.name);
-        console.log('Peripheral ID:', peripheral.id);
-        console.log('Peripheral Advertising:', peripheral.advertising);
-        console.log('Peripheral RSSI:', peripheral.rssi);
-        console.log('Peripheral UUID:', peripheral.id); 
-      });
-  
-      // Find the selected peripheral by its name
-      const selectedPeripheral = peripherals.find(peripheral => peripheral.name === deviceName);
+  useEffect(() => {
+    console.log('Connected:', connected);
+  }, [connected]);
+
+  // Function to handle the connect button press
+  const handleConnectPress = async () => {
+    try {
+      const discoveredPeripherals = await BleManager.getDiscoveredPeripherals([]);
+
+      const selectedPeripheral = discoveredPeripherals.find(peripheral => peripheral.name === deviceName);
       if (selectedPeripheral) {
         connectToPeripheral(selectedPeripheral);
       } else {
-        console.log('Peripheral not found');
+        Alert.alert('Peripheral Not Found', `Cannot find peripheral "${deviceName}".`);
       }
-    });
+    } catch (error) {
+      console.log('Error:', error);
+    }
   };
-  
-  // Function to connect/disconnect to the peripheral
+
+  // Function to connect to the peripheral
   const connectToPeripheral = peripheral => {
     if (peripheral.connected) {
-      // If already connected, disconnect from the peripheral
-      BleManager.disconnect(peripheral.id).then(() => {
-        peripheral.connected = false;
-        setConnected(false);
-        setConnectionStatus(`Disconnected from ${peripheral.name}`);
-      });
-    } else {
-      // If not connected, connect to the peripheral
-      BleManager.connect(peripheral.id)
-        .then(() => {
-          let peripheralResponse = peripherals.get(peripheral.id);
-          if (peripheralResponse) {
-            peripheralResponse.connected = true;
-            peripherals.set(peripheral.id, peripheralResponse);
-            setConnected(true);
-            setConnectionStatus(`Connected to ${peripheral.name}`);
-          }
-          alert('Connected to ' + peripheral.name);
-        })
-        .catch(error => console.log(error));
-
-      /* Read current RSSI value */
-      setTimeout(() => {
-        // Retrieve services of the connected peripheral
-        BleManager.retrieveServices(peripheral.id)
-          .then(peripheralData => {
-            console.log('Peripheral services:', peripheralData);
-          })
-          .catch(error => {
-            console.log('Service retrieval error:', error);
-          });
-      }, 900);
+      Alert.alert('Connection Status', `Already connected to ${peripheral.name}`);
+      return;
     }
+
+    BleManager.connect(peripheral.id)
+      .then(() => {
+        setConnected(true);
+        setConnectionStatus(`Connected to ${peripheral.name}`);
+      })
+      .catch(error => {
+        Alert.alert('Connection Error', `Failed to connect to "${deviceName}".`);
+        console.log(error);
+      });
+
+    setTimeout(() => {
+      // Retrieve services from the peripheral
+      BleManager.retrieveServices(peripheral.id)
+        .then(peripheralData => {
+          // Handle retrieved services
+        })
+        .catch(error => {
+          console.log('Service retrieval error:', error);
+        });
+    }, 900);
+  };
+
+  // Function to handle the finish button press
+  const handleFinishPress = () => {
+    navigation.navigate('HomeScreen');
   };
 
   return (
@@ -83,14 +74,21 @@ const ConnectionScreen = ({ route }) => {
       </View>
       <Image source={LogoImage} style={styles.logo} />
       <View style={styles.buttonsContainer}>
-        <TouchableOpacity style={styles.connectButton} onPress={handleConnectPress}>
-          <Text style={styles.connectButtonText}>Connect</Text>
-        </TouchableOpacity>
+        {!connected && (
+          <TouchableOpacity style={styles.connectButton} onPress={handleConnectPress}>
+            <Text style={styles.connectButtonText}>Connect</Text>
+          </TouchableOpacity>
+        )}
         <Text style={styles.connectionStatusText}>{connectionStatus}</Text>
       </View>
+      <TouchableOpacity style={styles.finishButton} onPress={handleFinishPress}>
+        <Text style={styles.finishButtonText}>Done</Text>
+      </TouchableOpacity>
     </View>
   );
 };
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -134,6 +132,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'black',
     fontWeight: 'bold',
+  },
+  finishButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: '#007FFF',
+    padding: 10,
+    borderRadius: 30,
+  },
+  finishButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
 });
 
