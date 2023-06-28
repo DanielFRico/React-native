@@ -17,7 +17,7 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate("BluetoothScreen")}
+          onPress={() => navigation.navigate("SafeBirdDevicesScreen")}
         >
           <Text style={styles.buttonText}>Bluetooth</Text>
         </TouchableOpacity>
