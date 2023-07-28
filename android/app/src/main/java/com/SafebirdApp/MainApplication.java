@@ -1,4 +1,4 @@
-package com.webrtcimageapp;
+package com.SafebirdApp;
 
 import android.app.Application;
 import com.facebook.react.PackageList;

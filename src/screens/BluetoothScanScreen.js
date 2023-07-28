@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'white'
   },
   headerContainer: {
     alignItems: 'center',
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
     left: 20,
   },
   cancelButtonText: {
-    color: 'blue',
+      color: '#a15943',
     fontSize: 16,
   },
 });

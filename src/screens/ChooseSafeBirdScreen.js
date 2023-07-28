@@ -39,7 +39,7 @@ const ChooseSafeBirdScreen = ({ route, navigation }) => {
             key={device.id}
             style={[
               styles.deviceItem,
-              selectedDeviceId === device.id && styles.selectedDeviceItem, 
+              selectedDeviceId === device.id && styles.selectedDeviceItem,
             ]}
             onPress={() => handleDevicePress(device.id)}
           >
@@ -65,35 +65,38 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 10,
-    color: '#000',
+      color: '#2e2e2d',
   },
   subHeaderText: {
     fontSize: 16,
     textAlign: 'center',
-    color: '#000',
+      color: '#2e2e2d',
     marginHorizontal: 20,
     marginBottom: 10,
   },
   devicesContainer: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     width: '80%',
     padding: 10,
     borderRadius: 5,
     marginBottom: 50,
     marginTop: 20,
-    minHeight: 200, 
+    minHeight: 200,
+      borderWidth: 2,
+      borderColor: '#a15943'
   },
   deviceItem: {
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    borderBottomColor: '#a15943',
   },
   selectedDeviceItem: {
-    backgroundColor: 'lightblue',
+      color: 'white',
+    backgroundColor: '#a15943',
   },
   deviceText: {
     fontSize: 16,
-    color: '#000',
+      color: '#a15943',
   },
   continueText: {
     position: 'absolute',
@@ -101,9 +104,9 @@ const styles = StyleSheet.create({
     right: 20,
   },
   continueButtonText: {
-    color: 'blue',
+      color: '#a15943',
     fontSize: 16,
-    textDecorationLine: 'none', 
+    textDecorationLine: 'none',
   },
 });
 

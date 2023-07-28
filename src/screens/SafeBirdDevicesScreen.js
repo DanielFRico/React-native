@@ -92,13 +92,13 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 30,
     textAlign: 'center',
-    color: '#000',
-    marginTop: -10,
+    color: '#2e2e2d',
+    marginTop: 30,
   },
   subHeaderText: {
     fontSize: 16,
     textAlign: 'center',
-    color: '#000',
+    color: '#2e2e2d',
     marginHorizontal: 20,
     marginTop: 10,
   },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     marginTop : 30
   },
   plusButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#a15943',
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     bottom: 20,
   },
   plusButtonText: {
-    color: '#000',
+    color: '#fff',
     fontSize: 30,
   },
 });

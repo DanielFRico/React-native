@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native';
 import BleManager from 'react-native-ble-manager';
-import LogoImage from '../../assets/Computer.png';
+import LogoImage from '../../assets/computer.png';
 
 const ConnectionScreen = ({ route, navigation }) => {
   const { deviceName } = route.params;
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#007FFF',
+    backgroundColor: '#a15943',
     padding: 10,
     borderRadius: 30,
   },
