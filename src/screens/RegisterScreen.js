@@ -27,19 +27,8 @@ const RegisterScreen = ({ navigation }) => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [subscription, setSubscription ] = useState(false);
 
-    const onFooterLinkPress = () => {
-        navigation.navigate('LoginScreen')
-    };
 
     const onRegisterPress = async () => {
-        // if(email || password === ''){
-        //     alert("Password or email are empty");
-        //     return
-        // }
-        // if (password !== confirmPassword) {
-        //     alert("Passwords don't match.");
-        //     return
-        // }
         try {
             // Create a user with email and password using Firebase Auth
             const { user } = await auth().createUserWithEmailAndPassword(email, password);
@@ -58,6 +47,12 @@ const RegisterScreen = ({ navigation }) => {
         } catch (error) {
             alert(error)
         }
+    };
+
+
+
+    const onFooterLinkPress = () => {
+        navigation.navigate('LoginScreen')
     };
 
     return (

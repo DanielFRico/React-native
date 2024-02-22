@@ -23,16 +23,7 @@ const LoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    const onFooterLinkPress = () => {
-        navigation.navigate('RegisterScreen')
-    };
-
-    const onChangePasswordPress = () => {
-        navigation.navigate('ForgotPasswordScreen')
-    };
-
     const onLoginPress = () => {
-
         auth()
             .signInWithEmailAndPassword(email, password)
             .then((response) => {
@@ -56,6 +47,15 @@ const LoginScreen = ({ navigation }) => {
             .catch(error => {
                 alert(error)
             })
+    };
+
+
+    const onFooterLinkPress = () => {
+        navigation.navigate('RegisterScreen')
+    };
+
+    const onChangePasswordPress = () => {
+        navigation.navigate('ForgotPasswordScreen')
     };
 
     return (

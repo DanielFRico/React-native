@@ -43,7 +43,7 @@ const ChooseSafeBirdScreen = ({ route, navigation }) => {
             ]}
             onPress={() => handleDevicePress(device.id)}
           >
-            <Text style={styles.deviceText}>{device.name}</Text>
+            <Text style={styles.selectedDeviceItem}>{device.name}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -89,10 +89,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#a15943',
+
   },
   selectedDeviceItem: {
-      color: 'white',
     backgroundColor: '#a15943',
+    color:'white'
+
   },
   deviceText: {
     fontSize: 16,

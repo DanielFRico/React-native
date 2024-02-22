@@ -7,8 +7,8 @@ import firestore from '@react-native-firebase/firestore';
 import { doc, getDoc } from "firebase/firestore";
 
 import { Ionicons } from "react-vector-icons";
-const HomeScreen = ({ navigation }) => {
 
+const HomeScreen = ({ navigation }) => {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [username, setUsername] = useState('');
@@ -26,9 +26,7 @@ const HomeScreen = ({ navigation }) => {
         if (userDoc.exists) {
           setUsername(userDoc.data().username);
         }
-
         const userDocRef = firestore().collection('users').doc(user.uid);
-
         // Subscribe to real-time updates for the user's document
         const unsubscribe = userDocRef.onSnapshot((docSnapshot) => {
           if (docSnapshot.exists) {
@@ -37,7 +35,6 @@ const HomeScreen = ({ navigation }) => {
         });
       }
     };
-
     fetchCurrentUser();
   }, []);
 

@@ -47,7 +47,6 @@ const ForgotPasswordScreen = ({ navigation }) => {
                 <View style={styles.footerView}>
                     <Text onPress={onFooterLinkPress} style={styles.footerLink}>login</Text>
                 </View>
-
             </ScrollView>
         </View>
 
