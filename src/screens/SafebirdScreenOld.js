@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Image, Text } from 'react-native';
-import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription } from 'react-native-webrtc';
+import React, {useEffect, useState} from 'react';
+import {StyleSheet, View, Image, Text} from 'react-native';
+import {
+  RTCPeerConnection,
+  RTCIceCandidate,
+  RTCSessionDescription,
+} from 'react-native-webrtc';
 import base64 from 'base-64';
 
-const webRTCScreen = () => {
+const WebRTCScreen = () => {
   const [imageSrc, setImageSrc] = useState(null);
   const [nextImageSrc, setNextImageSrc] = useState(null);
   const [socket, setSocket] = useState(null);
@@ -12,17 +16,19 @@ const webRTCScreen = () => {
     if (nextImageSrc) {
       setImageSrc(nextImageSrc);
       setNextImageSrc(null);
-      socket.send(JSON.stringify({ readyForNextImage: true }));
+      socket.send(JSON.stringify({readyForNextImage: true}));
     }
   }, [nextImageSrc]);
 
   useEffect(() => {
     const setupWebrtc = async () => {
+      console.log('newwwww');
       const peerConnection = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        iceServers: [{urls: 'stun:stun.l.google.com:19302'}],
       });
 
-      const ws = new WebSocket('ws://172.17.0.1:8080');
+      const ws = new WebSocket('ws://192.168.1.13:8080');
+      console.log('ws', ws);
       setSocket(ws);
       const iceCandidatesQueue = [];
 
@@ -30,20 +36,24 @@ const webRTCScreen = () => {
         console.log('Connected to server');
       };
 
-      ws.onerror = (event) => {
+      ws.onerror = event => {
         console.error('WebSocket error:', event);
       };
 
-      ws.onmessage = async (event) => {
-        const { candidate, description } = JSON.parse(event.data);
+      ws.onmessage = async event => {
+        const {candidate, description} = JSON.parse(event.data);
 
         if (candidate) {
           iceCandidatesQueue.push(new RTCIceCandidate(candidate));
         } else if (description) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(description));
+          await peerConnection.setRemoteDescription(
+            new RTCSessionDescription(description),
+          );
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
-          ws.send(JSON.stringify({ description: peerConnection.localDescription }));
+          ws.send(
+            JSON.stringify({description: peerConnection.localDescription}),
+          );
 
           // Process queued ICE candidates
           while (iceCandidatesQueue.length) {
@@ -53,7 +63,7 @@ const webRTCScreen = () => {
         }
       };
 
-      peerConnection.ondatachannel = (event) => {
+      peerConnection.ondatachannel = event => {
         const dataChannel = event.channel;
 
         function arrayBufferToBase64(buffer) {
@@ -66,7 +76,7 @@ const webRTCScreen = () => {
         }
 
         dataChannel.binaryType = 'arraybuffer';
-        dataChannel.onmessage = ({ data }) => {
+        dataChannel.onmessage = ({data}) => {
           const base64Image = arrayBufferToBase64(data);
           setNextImageSrc(`data:image/jpeg;base64,${base64Image}`);
           // console.log('Image received');
@@ -82,7 +92,7 @@ const webRTCScreen = () => {
         };
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = event => {
         console.log('Disconnected from server', event);
         peerConnection.close();
       };
@@ -95,7 +105,7 @@ const webRTCScreen = () => {
     <View style={styles.container}>
       {imageSrc ? (
         <>
-          <Image style={styles.image} source={{ uri: imageSrc }} />
+          <Image style={styles.image} source={{uri: imageSrc}} />
           <Text style={styles.overlayText}>It works!</Text>
         </>
       ) : (
@@ -125,4 +135,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default webRTCScreen ;
+export default WebRTCScreen;
