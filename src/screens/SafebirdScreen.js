@@ -19,23 +19,31 @@ function generateRandomString(length) {
   return result;
 }
 
-const iceServerHost = '148.113.140.112';
-const iceServerProto = 'udp';
-const iceServerPort = '3478';
-const iceServerUser = 'mobiera';
-const iceServerPass = 'L971EHmpPe';
+const fetchServiceConfig = async () => {
+  try {
+    const response = await fetch(
+      'https://webrtc-server.core.dev.2060.io/config',
+    );
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching fetchServiceConfig:', error);
+    return null;
+  }
+};
 
 registerGlobals();
 const VideoCall = () => {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
-  const roomId = useRef(null);
+  const roomId = useRef('fondinl8');
   const peerId = useRef(null);
   const peer = useRef();
   const sendTransport = useRef();
   const recvTransport = useRef();
   const device = useRef();
   const routerRtpCapabilities = useRef();
+  const serviceConfig = useRef();
 
   const fetchRoomId = async () => {
     try {
@@ -43,16 +51,31 @@ const VideoCall = () => {
         'https://webrtc-server.core.dev.2060.io/getRoomId',
       );
       const data = await response.json();
-      roomId.current = data.roomId;
+      // roomId.current = data.roomId;
       peerId.current = generateRandomString(8);
     } catch (error) {
       console.error('Error fetching RoomId:', error);
     }
   };
 
+  const getIceServerConfig = async () => {
+    try {
+      const serviceConfigResponse = await fetchServiceConfig();
+      serviceConfig.current = {
+        ...serviceConfigResponse.config.iceserver,
+        iceServerPass: 'L971EHmpPe',
+        iceServerUser: 'mobiera',
+      };
+    } catch (error) {
+      console.error('Error making server config', error);
+      throw new Error(error);
+    }
+  };
+
   useEffect(() => {
     const setup = async () => {
       await fetchRoomId();
+      await getIceServerConfig();
       const transport = new protooClient.WebSocketTransport(
         `wss://webrtc-server.core.dev.2060.io:443/?roomId=${roomId.current}&peerId=${peerId.current}&consumerReplicas=undefined`,
       );
@@ -63,17 +86,16 @@ const VideoCall = () => {
           await createSendTransport();
           await createRecvTransport();
 
-          const message = await peer.current.request('join', {
+          const joinRoomResponse = await peer.current.request('join', {
             displayName: 'test Name',
             device: device.current,
             rtpCapabilities: routerRtpCapabilities.current,
             sctpCapabilities: undefined,
           });
           console.log(
-            'unido a la sala exitosamente en la sala',
-            message,
+            'unido a la sala exitosamente en la salaaa',
+            joinRoomResponse.peers[0],
             roomId.current,
-            peerId.current,
           );
 
           const stream = await mediaDevices.getUserMedia({
@@ -81,34 +103,29 @@ const VideoCall = () => {
             video: true,
           });
           setLocalStream(stream);
+          console.log(
+            'current.codecs[1].mimeType',
+            routerRtpCapabilities.current.codecs[1].mimeType.toLowerCase(),
+          );
           const trackVideo = stream.getVideoTracks()[0];
           const trackAudio = stream.getAudioTracks()[0];
-          const producer = await sendTransport.current.produce({
+          await sendTransport.current.produce({
             track: trackVideo,
           });
-          const producerAudio = await sendTransport.current.produce({
+          await sendTransport.current.produce({
             track: trackAudio,
           });
-          const dataProducer = await sendTransport.current.produceData({
+          await sendTransport.current.produceData({
             ordered: true,
             label: 'foo',
           });
-          //console.log('trackAudio', trackAudio);
-          //console.log('trackvideo', trackVideo);
-          //console.log('producerAudio:', producerAudio);
-          //console.log('dataProducer:', dataProducer);
-          //console.log('Producer:', producer);
-          console.log('SendTransport ID:', sendTransport.current.id);
         } catch (error) {
           console.error('Error creating send transport:', error);
         }
       });
       peer.current.on('request', async (request, accept, reject) => {
-        console.log('request lst', request);
-
         if (request.method === 'newConsumer') {
           console.log('*********** New Consumer!');
-
           const {
             peerId: consumerPeerId,
             producerId,
@@ -119,16 +136,12 @@ const VideoCall = () => {
             appData,
             producerPaused,
           } = request.data;
-
           try {
             const consumer = await recvTransport.current.consume({
               id,
               producerId,
               kind,
               rtpParameters,
-              // NOTE: Force streamId to be same in mic and webcam and different
-              // in screen sharing so libwebrtc will just try to sync mic and
-              // webcam streams from the same remote peer.
               streamId: `${consumerPeerId}-${
                 appData.share ? 'share' : 'mic-webcam'
               }`,
@@ -139,12 +152,16 @@ const VideoCall = () => {
               const stream = new MediaStream();
               stream.addTrack(consumer.track);
               setRemoteStream(stream);
+              console.log('llego el consumer de video', stream);
             }
             // TODO: Add consumer
+            /*
             consumer.on('transportclose', () => {
+              console.log('transportclose este peer se ha salido');
               //this._consumers.delete(consumer.id);
               // TODO: Delete consumer
             });
+            */
           } catch (error) {
             console.error('Error consuming', error);
           }
@@ -153,21 +170,126 @@ const VideoCall = () => {
       peer.current.on('failed', () => {
         console.log('Socket connection failed');
       });
+      peer.current.on('notification', notification => {
+        console.log(
+          'proto "notification" event [method:%s, data:%o]',
+          notification.method,
+          notification.data,
+        );
+        switch (notification.method) {
+          case 'producerScore': {
+            const {producerId, score} = notification.data;
+            console.log('producerScore', producerId, score);
+            break;
+          }
+          case 'newPeer': {
+            const peer = notification.data;
+            console.log('newPeer', peer);
+            break;
+          }
+          case 'peerClosed': {
+            const {peerId} = notification.data;
+            console.log('peerClosed', peerId);
+            break;
+          }
+          case 'peerDisplayNameChanged': {
+            const {peerId, displayName, oldDisplayName} = notification.data;
+            console.log(
+              'peerDisplayNameChanged',
+              peerId,
+              displayName,
+              oldDisplayName,
+            );
+            break;
+          }
+          case 'downlinkBwe': {
+            console.log('downlinkBwe');
+            break;
+          }
+          case 'consumerClosed': {
+            const {consumerId} = notification.data;
+            //const consumer = this._consumers.get(consumerId)
+            //if (!consumer) break
+            //consumer.close()
+            //this._consumers.delete(consumerId)
+            //const { peerId } = consumer.appData
+            console.log('consumerClosed');
+            break;
+          }
+          case 'consumerPaused': {
+            const {consumerId} = notification.data;
+            /*const consumer = this._consumers.get(consumerId)
+      if (!consumer) break
+      consumer.pause()
+      store.dispatch(stateActions.setConsumerPaused(consumerId, 'remote'))*/
+            console.log('consumerClosed');
+            break;
+          }
+          case 'consumerResumed': {
+            const {consumerId} = notification.data;
+            /*const consumer = this._consumers.get(consumerId)
+      if (!consumer) break
+      consumer.resume()
+      store.dispatch(stateActions.setConsumerResumed(consumerId, 'remote'))*/
+            console.log('consumerResumed');
+            break;
+          }
+          case 'consumerLayersChanged': {
+            const {consumerId, spatialLayer, temporalLayer} = notification.data;
+            /*const consumer = this._consumers.get(consumerId)
+      if (!consumer) break
+      store.dispatch(stateActions.setConsumerCurrentLayers(consumerId, spatialLayer, temporalLayer))*/
+            console.log('consumerLayersChanged');
+            break;
+          }
+          case 'consumerScore': {
+            const {consumerId, score} = notification.data;
+            console.log('consumerLayersChanged');
+            break;
+          }
+          case 'dataConsumerClosed': {
+            const {dataConsumerId} = notification.data;
+            /*const dataConsumer = this._dataConsumers.get(dataConsumerId)
+      if (!dataConsumer) break
+      dataConsumer.close()
+      this._dataConsumers.delete(dataConsumerId)
+      const { peerId } = dataConsumer.appData
+      store.dispatch(stateActions.removeDataConsumer(dataConsumerId, peerId))*/
+            console.log('dataConsumerClosed');
+            break;
+          }
+          case 'activeSpeaker': {
+            const {peerId} = notification.data;
+            //store.dispatch(stateActions.setRoomActiveSpeaker(peerId))
+            console.log('activeSpeaker');
+            break;
+          }
+          default: {
+            console.error(
+              'unknown protoo notification.method "%s"',
+              notification.method,
+            );
+          }
+        }
+      });
+      peer.current.on('close', data => {
+        console.log('algo se salio', data);
+      });
     };
     setup();
   }, []);
 
   const createSendTransport = async () => {
-    console.log('peer.current', peer.current?.connected);
     device.current = new Device();
     routerRtpCapabilities.current = await peer.current.request(
       'getRouterRtpCapabilities',
     );
+    console.log('routerRtpCapabilities', routerRtpCapabilities.current);
     await device.current.load({
       routerRtpCapabilities: routerRtpCapabilities.current,
     });
     try {
-      const transportInfo = await peer.current.request(
+      const producerTransportInfo = await peer.current.request(
         'createWebRtcTransport',
         {
           forceTcp: false,
@@ -177,7 +299,7 @@ const VideoCall = () => {
         },
       );
       const {id, iceParameters, iceCandidates, dtlsParameters, sctpParameters} =
-        transportInfo;
+        producerTransportInfo;
       const transportOptions = {
         id,
         iceParameters,
@@ -186,9 +308,9 @@ const VideoCall = () => {
         sctpParameters,
         iceServers: [
           {
-            urls: `turn:${iceServerHost}:${iceServerPort}?transport=${iceServerProto}`,
-            username: iceServerUser,
-            credential: iceServerPass,
+            urls: `turn:${serviceConfig.current.iceServerHost}:${serviceConfig.current.iceServerPort}?transport=${serviceConfig.current.iceServerProto}`,
+            username: serviceConfig.current.iceServerUser,
+            credential: serviceConfig.current.iceServerPass,
           },
         ],
         iceTransportPolicy: 'relay',
@@ -214,13 +336,8 @@ const VideoCall = () => {
       sendTransport.current.on(
         'produce',
         async ({kind, rtpParameters, appData}, callback, errback) => {
+          console.log('rtpParameters on produce', rtpParameters);
           try {
-            /*console.log('entro al producer listener', {
-              transportId: sendTransport.current.id,
-              kind,
-              rtpParameters,
-              appData,
-            });*/
             // eslint-disable-next-line no-shadow
             const {id} = await peer.current.request('produce', {
               transportId: sendTransport.current.id,
@@ -228,7 +345,6 @@ const VideoCall = () => {
               rtpParameters,
               appData,
             });
-            //console.log('paso por produce con id', id);
             callback({id});
           } catch (error) {
             errback(error);
@@ -242,7 +358,6 @@ const VideoCall = () => {
           callback,
           errback,
         ) => {
-          // Here we must communicate our local parameters to our remote transport.
           try {
             const {id} = await peer.current.request('produceData', {
               transportId: sendTransport.current.id,
@@ -251,7 +366,6 @@ const VideoCall = () => {
               protocol,
               appData,
             });
-
             // Done in the server, pass the response to our transport.
             callback({id});
           } catch (error) {
@@ -267,7 +381,7 @@ const VideoCall = () => {
 
   const createRecvTransport = async () => {
     try {
-      const transportInfo = await peer.current.request(
+      const consumerTransportInfo = await peer.current.request(
         'createWebRtcTransport',
         {
           forceTcp: false,
@@ -276,9 +390,8 @@ const VideoCall = () => {
           sctpCapabilities: true,
         },
       );
-
       const {id, iceParameters, iceCandidates, dtlsParameters, sctpParameters} =
-        transportInfo;
+        consumerTransportInfo;
 
       recvTransport.current = device.current.createRecvTransport({
         id,
@@ -286,17 +399,14 @@ const VideoCall = () => {
         iceCandidates,
         dtlsParameters: {
           ...dtlsParameters,
-          // Remote DTLS role. We know it's always 'auto' by default so, if
-          // we want, we can force local WebRTC transport to be 'client' by
-          // indicating 'server' here and vice-versa.
           role: 'auto',
         },
         sctpParameters,
         iceServers: [
           {
-            urls: `turn:${iceServerHost}:${iceServerPort}?transport=${iceServerProto}`,
-            username: iceServerUser,
-            credential: iceServerPass,
+            urls: `turn:${serviceConfig.current.iceServerHost}:${serviceConfig.current.iceServerPort}?transport=${serviceConfig.current.iceServerProto}`,
+            username: serviceConfig.current.iceServerUser,
+            credential: serviceConfig.current.iceServerPass,
           },
         ],
         iceTransportPolicy: 'relay',
