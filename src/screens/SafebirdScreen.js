@@ -6,7 +6,8 @@ import {
   mediaDevices,
   registerGlobals,
 } from 'react-native-webrtc';
-import protooClient from 'protoo-client';
+import {WebSocketTransport, Peer} from 'protoo-client';
+import {Button} from 'react-native';
 
 function generateRandomString(length) {
   const characters =
@@ -32,31 +33,55 @@ const fetchServiceConfig = async () => {
   }
 };
 
+const fetchRoomId = async () => {
+  try {
+    const response = await fetch(
+      'https://webrtc-server.core.dev.2060.io/getRoomId',
+    );
+    const data = await response.json();
+    return data.roomId;
+  } catch (error) {
+    console.error('Error fetching RoomId:', error);
+    throw new Error(error);
+  }
+};
+
+const getTransportOptions = (transportInfo, serviceConfig) => {
+  const {id, iceParameters, iceCandidates, dtlsParameters, sctpParameters} =
+    transportInfo;
+  return {
+    id,
+    iceParameters,
+    iceCandidates,
+    dtlsParameters: {
+      ...dtlsParameters,
+      role: 'auto',
+    },
+    sctpParameters,
+    iceServers: [
+      {
+        urls: `turn:${serviceConfig.iceServerHost}:${serviceConfig.iceServerPort}?transport=${serviceConfig.iceServerProto}`,
+        username: serviceConfig.iceServerUser,
+        credential: serviceConfig.iceServerPass,
+      },
+    ],
+    iceTransportPolicy: 'relay',
+  };
+};
+
 registerGlobals();
 const VideoCall = () => {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
-  const roomId = useRef('fondinl8');
+  const roomId = useRef('vcwrong1');
   const peerId = useRef(null);
   const peer = useRef();
+  const consumer = useRef();
   const sendTransport = useRef();
   const recvTransport = useRef();
   const device = useRef();
   const routerRtpCapabilities = useRef();
   const serviceConfig = useRef();
-
-  const fetchRoomId = async () => {
-    try {
-      const response = await fetch(
-        'https://webrtc-server.core.dev.2060.io/getRoomId',
-      );
-      const data = await response.json();
-      // roomId.current = data.roomId;
-      peerId.current = generateRandomString(8);
-    } catch (error) {
-      console.error('Error fetching RoomId:', error);
-    }
-  };
 
   const getIceServerConfig = async () => {
     try {
@@ -74,70 +99,38 @@ const VideoCall = () => {
 
   useEffect(() => {
     const setup = async () => {
-      await fetchRoomId();
+      //roomId.current = await fetchRoomId();
+      peerId.current = generateRandomString(8);
       await getIceServerConfig();
-      const transport = new protooClient.WebSocketTransport(
+      const webSocketTransport = new WebSocketTransport(
         `wss://webrtc-server.core.dev.2060.io:443/?roomId=${roomId.current}&peerId=${peerId.current}&consumerReplicas=undefined`,
       );
-      peer.current = new protooClient.Peer(transport);
+      peer.current = new Peer(webSocketTransport);
       peer.current.on('open', async () => {
         console.log('Socket Connection opened');
         try {
           await createSendTransport();
           await createRecvTransport();
-
-          const joinRoomResponse = await peer.current.request('join', {
-            displayName: 'test Name',
-            device: device.current,
-            rtpCapabilities: routerRtpCapabilities.current,
-            sctpCapabilities: undefined,
-          });
-          console.log(
-            'unido a la sala exitosamente en la salaaa',
-            joinRoomResponse.peers[0],
-            roomId.current,
-          );
-
-          const stream = await mediaDevices.getUserMedia({
-            audio: true,
-            video: true,
-          });
-          setLocalStream(stream);
-          console.log(
-            'current.codecs[1].mimeType',
-            routerRtpCapabilities.current.codecs[1].mimeType.toLowerCase(),
-          );
-          const trackVideo = stream.getVideoTracks()[0];
-          const trackAudio = stream.getAudioTracks()[0];
-          await sendTransport.current.produce({
-            track: trackVideo,
-          });
-          await sendTransport.current.produce({
-            track: trackAudio,
-          });
-          await sendTransport.current.produceData({
-            ordered: true,
-            label: 'foo',
-          });
+          await joinToRoom();
+          await startToProduceStream();
         } catch (error) {
           console.error('Error creating send transport:', error);
         }
       });
       peer.current.on('request', async (request, accept, reject) => {
+        console.log('llego un nuevo request', request);
         if (request.method === 'newConsumer') {
-          console.log('*********** New Consumer!');
-          const {
-            peerId: consumerPeerId,
-            producerId,
-            id,
-            kind,
-            rtpParameters,
-            type,
-            appData,
-            producerPaused,
-          } = request.data;
           try {
-            const consumer = await recvTransport.current.consume({
+            console.log('*********** New Consumer!');
+            const {
+              peerId: consumerPeerId,
+              producerId,
+              id,
+              kind,
+              rtpParameters,
+              appData,
+            } = request.data;
+            const consumerOptions = {
               id,
               producerId,
               kind,
@@ -146,36 +139,26 @@ const VideoCall = () => {
                 appData.share ? 'share' : 'mic-webcam'
               }`,
               appData: {...appData, consumerPeerId}, // Trick.
-            });
+            };
+            consumer.current = await recvTransport.current.consume(
+              consumerOptions,
+            );
             accept();
             if (kind === 'video') {
               const stream = new MediaStream();
-              stream.addTrack(consumer.track);
+              stream.addTrack(consumer.current.track);
               setRemoteStream(stream);
-              console.log('llego el consumer de video', stream);
             }
-            // TODO: Add consumer
-            /*
-            consumer.on('transportclose', () => {
-              console.log('transportclose este peer se ha salido');
-              //this._consumers.delete(consumer.id);
-              // TODO: Delete consumer
-            });
-            */
           } catch (error) {
-            console.error('Error consuming', error);
+            console.error('Error when new consumer is coming', error);
           }
         }
       });
-      peer.current.on('failed', () => {
-        console.log('Socket connection failed');
+      peer.current.on('failed', messageFailed => {
+        console.log('Socket connection failed', messageFailed);
       });
       peer.current.on('notification', notification => {
-        console.log(
-          'proto "notification" event [method:%s, data:%o]',
-          notification.method,
-          notification.data,
-        );
+        console.log(notification.method);
         switch (notification.method) {
           case 'producerScore': {
             const {producerId, score} = notification.data;
@@ -183,13 +166,17 @@ const VideoCall = () => {
             break;
           }
           case 'newPeer': {
-            const peer = notification.data;
-            console.log('newPeer', peer);
+            const newPeer = notification.data;
+            console.log('newPeer', newPeer);
             break;
           }
           case 'peerClosed': {
             const {peerId} = notification.data;
-            console.log('peerClosed', peerId);
+            console.log(
+              'la otra parte (peer) se salio de la llamada entonces yo tambien me salgo',
+              peerId,
+            );
+            // leaveMeeting();
             break;
           }
           case 'peerDisplayNameChanged': {
@@ -213,7 +200,7 @@ const VideoCall = () => {
             //consumer.close()
             //this._consumers.delete(consumerId)
             //const { peerId } = consumer.appData
-            console.log('consumerClosed');
+            console.log('consumerClosed', consumerId, consumer.current);
             break;
           }
           case 'consumerPaused': {
@@ -222,7 +209,7 @@ const VideoCall = () => {
       if (!consumer) break
       consumer.pause()
       store.dispatch(stateActions.setConsumerPaused(consumerId, 'remote'))*/
-            console.log('consumerClosed');
+            console.log('consumerPaused');
             break;
           }
           case 'consumerResumed': {
@@ -273,7 +260,7 @@ const VideoCall = () => {
         }
       });
       peer.current.on('close', data => {
-        console.log('algo se salio', data);
+        console.log('me sali de la llamada', data);
       });
     };
     setup();
@@ -284,7 +271,6 @@ const VideoCall = () => {
     routerRtpCapabilities.current = await peer.current.request(
       'getRouterRtpCapabilities',
     );
-    console.log('routerRtpCapabilities', routerRtpCapabilities.current);
     await device.current.load({
       routerRtpCapabilities: routerRtpCapabilities.current,
     });
@@ -298,25 +284,13 @@ const VideoCall = () => {
           sctpCapabilities: true,
         },
       );
-      const {id, iceParameters, iceCandidates, dtlsParameters, sctpParameters} =
-        producerTransportInfo;
-      const transportOptions = {
-        id,
-        iceParameters,
-        iceCandidates,
-        dtlsParameters: {...dtlsParameters, role: 'auto'},
-        sctpParameters,
-        iceServers: [
-          {
-            urls: `turn:${serviceConfig.current.iceServerHost}:${serviceConfig.current.iceServerPort}?transport=${serviceConfig.current.iceServerProto}`,
-            username: serviceConfig.current.iceServerUser,
-            credential: serviceConfig.current.iceServerPass,
-          },
-        ],
-        iceTransportPolicy: 'relay',
-      };
-      sendTransport.current =
-        device.current.createSendTransport(transportOptions);
+      const senderTransportOptions = getTransportOptions(
+        producerTransportInfo,
+        serviceConfig.current,
+      );
+      sendTransport.current = device.current.createSendTransport(
+        senderTransportOptions,
+      );
       sendTransport.current.on(
         'connect',
         async ({dtlsParameters}, callback, errback) => {
@@ -338,7 +312,6 @@ const VideoCall = () => {
         async ({kind, rtpParameters, appData}, callback, errback) => {
           console.log('rtpParameters on produce', rtpParameters);
           try {
-            // eslint-disable-next-line no-shadow
             const {id} = await peer.current.request('produce', {
               transportId: sendTransport.current.id,
               kind,
@@ -351,6 +324,7 @@ const VideoCall = () => {
           }
         },
       );
+      const {id} = producerTransportInfo;
       sendTransport.current.on(
         'producedata',
         async (
@@ -359,7 +333,7 @@ const VideoCall = () => {
           errback,
         ) => {
           try {
-            const {id} = await peer.current.request('produceData', {
+            await peer.current.request('produceData', {
               transportId: sendTransport.current.id,
               sctpStreamParameters,
               label,
@@ -379,6 +353,40 @@ const VideoCall = () => {
     }
   };
 
+  const joinToRoom = async () => {
+    const joinRoomResponse = await peer.current.request('join', {
+      displayName: 'test Name',
+      device: device.current,
+      rtpCapabilities: routerRtpCapabilities.current,
+      sctpCapabilities: undefined,
+    });
+    console.log(
+      'unido a la sala exitosamente en la salaaa',
+      joinRoomResponse,
+      roomId.current,
+    );
+  };
+
+  const startToProduceStream = async () => {
+    const stream = await mediaDevices.getUserMedia({
+      audio: true,
+      video: true,
+    });
+    setLocalStream(stream);
+    const trackVideo = stream.getVideoTracks()[0];
+    const trackAudio = stream.getAudioTracks()[0];
+    await sendTransport.current.produce({
+      track: trackVideo,
+    });
+    await sendTransport.current.produce({
+      track: trackAudio,
+    });
+    await sendTransport.current.produceData({
+      ordered: true,
+      label: 'foo',
+    });
+  };
+
   const createRecvTransport = async () => {
     try {
       const consumerTransportInfo = await peer.current.request(
@@ -390,30 +398,13 @@ const VideoCall = () => {
           sctpCapabilities: true,
         },
       );
-      const {id, iceParameters, iceCandidates, dtlsParameters, sctpParameters} =
-        consumerTransportInfo;
-
-      recvTransport.current = device.current.createRecvTransport({
-        id,
-        iceParameters,
-        iceCandidates,
-        dtlsParameters: {
-          ...dtlsParameters,
-          role: 'auto',
-        },
-        sctpParameters,
-        iceServers: [
-          {
-            urls: `turn:${serviceConfig.current.iceServerHost}:${serviceConfig.current.iceServerPort}?transport=${serviceConfig.current.iceServerProto}`,
-            username: serviceConfig.current.iceServerUser,
-            credential: serviceConfig.current.iceServerPass,
-          },
-        ],
-        iceTransportPolicy: 'relay',
-        additionalSettings: {
-          //encodedInsertableStreams: this._e2eKey && e2e.isSupported(),
-        },
-      });
+      const receiverTransportOptions = getTransportOptions(
+        consumerTransportInfo,
+        serviceConfig.current,
+      );
+      recvTransport.current = device.current.createRecvTransport(
+        receiverTransportOptions,
+      );
       recvTransport.current.on(
         'connect',
         async ({dtlsParameters}, callback, errback) => {
@@ -439,6 +430,12 @@ const VideoCall = () => {
     }
   };
 
+  const leaveMeeting = () => {
+    peer.current.close();
+    setRemoteStream(null);
+    setLocalStream(null);
+  };
+
   return (
     <>
       {localStream && (
@@ -448,7 +445,7 @@ const VideoCall = () => {
           style={{width: 400, height: 300}}
         />
       )}
-
+      <Button title="leave meeeting" onPress={leaveMeeting} />
       {remoteStream && (
         <RTCView
           streamURL={remoteStream.toURL()}
